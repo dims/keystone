@@ -8,6 +8,7 @@ vendor
 .tox
 keystone.egg-info/
 *.log
+!.travis.yml
 .coverage
 coverage.xml
 cover/*
