@@ -2,9 +2,6 @@ language: python
 sudo: true
 env:
   - TOXENV=py27
-  - TOXENV=pep8
-  - TOXENV=docs
-  - TOXENV=genconfig
 install:
   - travis_retry pip install tox
 script:
