@@ -20,6 +20,7 @@ import mock
 from oslo_config import cfg
 from oslo_db import exception as db_exception
 from oslo_db import options
+from oslo_log import log
 from oslo_log import versionutils
 from six.moves import range
 import sqlalchemy
@@ -815,21 +816,6 @@ class SqlFilterTests(SqlTests, test_backend.FilterTests):
         groups = self.identity_api.list_groups()
         self.assertTrue(len(groups) > 0)
 
-    def test_groups_for_user_filtered(self):
-        # The SQL identity driver currently does not support filtering on the
-        # listing groups for a given user, so will fail this test. This is
-        # raised as bug #1412447.
-        try:
-            super(SqlFilterTests, self).test_groups_for_user_filtered()
-        except matchers.MismatchError:
-            return
-        # We shouldn't get here...if we do, it means someone has fixed the
-        # above defect, so we can remove this test override. As an aside, it
-        # would be nice to have used self.assertRaises() around the call above
-        # to achieve the logic here...but that does not seem to work when
-        # wrapping another assert (it won't seem to catch the error).
-        self.assertTrue(False)
-
 
 class SqlLimitTests(SqlTests, test_backend.LimitTests):
     def setUp(self):
@@ -938,6 +924,14 @@ class SqlCredential(SqlTests):
 
 
 class DeprecatedDecorators(SqlTests):
+
+    def setUp(self):
+        super(DeprecatedDecorators, self).setUp()
+
+        # The only reason this is here is because report_deprecated_feature()
+        # registers the fatal_deprecations option which these tests use.
+        versionutils.report_deprecated_feature(
+            log.getLogger(__name__), 'ignore this message')
 
     def test_assignment_to_role_api(self):
         """Test that calling one of the methods does call LOG.deprecated.

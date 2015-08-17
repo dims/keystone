@@ -23,8 +23,8 @@ from oslo_config import cfg
 from oslo_log import log
 import six
 
-from keystone import clean
 from keystone.common import cache
+from keystone.common import clean
 from keystone.common import dependency
 from keystone.common import driver_hints
 from keystone.common import manager
@@ -201,7 +201,8 @@ class DomainConfigs(dict):
         for group in specific_config:
             for option in specific_config[group]:
                 domain_config['cfg'].set_override(
-                    option, specific_config[group][option], group)
+                    option, specific_config[group][option],
+                    group, enforce_type=True)
 
         domain_config['cfg_overrides'] = specific_config
         domain_config['driver'] = self._load_driver(domain_config)
@@ -364,6 +365,7 @@ def exception_translated(exception_type):
     return _exception_translated
 
 
+@notifications.listener
 @dependency.provider('identity_api')
 @dependency.requires('assignment_api', 'credential_api', 'id_mapping_api',
                      'resource_api', 'revoke_api')

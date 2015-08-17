@@ -22,7 +22,6 @@ from oslo_log import log
 from oslo_serialization import jsonutils
 import pbr.version
 
-from keystone import backends
 from keystone.common import driver_hints
 from keystone.common import openssl
 from keystone.common import sql
@@ -31,6 +30,7 @@ from keystone.common import utils
 from keystone import config
 from keystone import exception
 from keystone.i18n import _, _LW
+from keystone.server import backends
 from keystone import token
 
 
@@ -186,8 +186,8 @@ class FernetSetup(BasePermissionsSetup):
     """Setup a key repository for Fernet tokens.
 
     This also creates a primary key used for both creating and validating
-    Keystone Lightweight tokens. To improve security, you should rotate your
-    keys (using keystone-manage fernet_rotate, for example).
+    Fernet tokens. To improve security, you should rotate your keys (using
+    keystone-manage fernet_rotate, for example).
 
     """
 

@@ -45,6 +45,7 @@ from keystone.common import config as common_cfg
 from keystone.common import dependency
 from keystone.common import kvs
 from keystone.common.kvs import core as kvs_core
+from keystone.common import sql
 from keystone import config
 from keystone import controllers
 from keystone import exception
@@ -145,8 +146,9 @@ def remove_generated_paste_config(extension_name):
 
 
 def skip_if_cache_disabled(*sections):
-    """This decorator is used to skip a test if caching is disabled either
-    globally or for the specific section.
+    """This decorator is used to skip a test if caching is disabled.
+
+    Caching can be disabled either globally or for a specific section.
 
     In the code fragment::
 
@@ -163,6 +165,7 @@ def skip_if_cache_disabled(*sections):
     If a specified configuration section does not define the `caching` option,
     this decorator makes the same assumption as the `should_cache_fn` in
     keystone.common.cache that caching should be enabled.
+
     """
     def wrapper(f):
         @functools.wraps(f)
@@ -180,9 +183,7 @@ def skip_if_cache_disabled(*sections):
 
 
 def skip_if_no_multiple_domains_support(f):
-    """This decorator is used to skip a test if an identity driver
-    does not support multiple domains.
-    """
+    """Decorator to skip tests for identity drivers limited to one domain."""
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         test_obj = args[0]
@@ -215,7 +216,7 @@ class TestClient(object):
 
         req = webob.Request.blank(path)
         req.method = method
-        for k, v in six.iteritems(headers):
+        for k, v in headers.items():
             req.headers[k] = v
         if body:
             req.body = body
@@ -379,6 +380,7 @@ class TestCase(BaseTestCase):
         self.addCleanup(setattr, controllers, '_VERSIONS', [])
 
     def config(self, config_files):
+        sql.initialize()
         CONF(args=[], project='keystone', default_config_files=config_files)
 
     def load_backends(self):
@@ -399,7 +401,7 @@ class TestCase(BaseTestCase):
         drivers, _unused = common.setup_backends(
             load_extra_backends_fn=self.load_extra_backends)
 
-        for manager_name, manager in six.iteritems(drivers):
+        for manager_name, manager in drivers.items():
             setattr(self, manager_name, manager)
         self.addCleanup(self.cleanup_instance(*list(drivers.keys())))
 
@@ -525,8 +527,7 @@ class TestCase(BaseTestCase):
 
     def assertRaisesRegexp(self, expected_exception, expected_regexp,
                            callable_obj, *args, **kwargs):
-        """Asserts that the message in a raised exception matches a regexp.
-        """
+        """Asserts that the message in a raised exception matches a regexp."""
         try:
             callable_obj(*args, **kwargs)
         except expected_exception as exc_value:

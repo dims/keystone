@@ -13,9 +13,7 @@
 """Utilities for Federation Extension."""
 
 import ast
-import os
 import re
-import tempfile
 
 import jsonschema
 from oslo_config import cfg
@@ -23,7 +21,7 @@ from oslo_log import log
 from oslo_utils import timeutils
 import six
 
-from keystone.contrib import federation
+from keystone.contrib.federation import constants as federation_constants
 from keystone import exception
 from keystone.i18n import _, _LW
 
@@ -289,7 +287,7 @@ def validate_groups(group_ids, mapping_id, identity_api):
 # TODO(marek-denis): Optimize this function, so the number of calls to the
 # backend are minimized.
 def transform_to_group_ids(group_names, mapping_id,
-                           identity_api, assignment_api):
+                           identity_api, resource_api):
     """Transform groups identitified by name/domain to their ids
 
     Function accepts list of groups identified by a name and domain giving
@@ -320,7 +318,7 @@ def transform_to_group_ids(group_names, mapping_id,
     :type mapping_id: str
 
     :param identity_api: identity_api object
-    :param assignment_api: assignment_api object
+    :param resource_api: resource manager object
 
     :returns: generator object with group ids
 
@@ -341,7 +339,7 @@ def transform_to_group_ids(group_names, mapping_id,
 
         """
         domain_id = (domain.get('id') or
-                     assignment_api.get_domain_by_name(
+                     resource_api.get_domain_by_name(
                      domain.get('name')).get('id'))
         return domain_id
 
@@ -531,7 +529,7 @@ class RuleProcessor(object):
             if user_type == UserType.EPHEMERAL:
                 user['domain'] = {
                     'id': (CONF.federation.federated_domain_name or
-                           federation.FEDERATED_DOMAIN_KEYWORD)
+                           federation_constants.FEDERATED_DOMAIN_KEYWORD)
                 }
 
         # initialize the group_ids as a set to eliminate duplicates
@@ -610,7 +608,7 @@ class RuleProcessor(object):
         LOG.debug('direct_maps: %s', direct_maps)
         LOG.debug('local: %s', local)
         new = {}
-        for k, v in six.iteritems(local):
+        for k, v in local.items():
             if isinstance(v, dict):
                 new_value = self._update_local_mapping(v, direct_maps)
             else:
@@ -668,7 +666,7 @@ class RuleProcessor(object):
             }
 
         :returns: identity values used to update local
-        :rtype: keystone.contrib.federation.utils.DirectMaps
+        :rtype: keystone.contrib.federation.utils.DirectMaps or None
 
         """
 
@@ -785,22 +783,3 @@ def assert_enabled_service_provider_object(service_provider):
         msg = _('Service Provider %(sp)s is disabled') % {'sp': sp_id}
         LOG.debug(msg)
         raise exception.Forbidden(msg)
-
-
-def write_to_tempfile(content, suffix='', prefix='tmp'):
-    """Create temporary file or use existing file.
-
-    This util is needed for creating temporary file with
-    specified content, suffix and prefix.
-
-    :param content: content for temporary file.
-    :param suffix: same as parameter 'suffix' for mkstemp
-    :param prefix: same as parameter 'prefix' for mkstemp
-    """
-    (fd, path) = tempfile.mkstemp(suffix=suffix, dir=None, prefix=prefix)
-
-    try:
-        os.write(fd, content)
-    finally:
-        os.close(fd)
-    return path

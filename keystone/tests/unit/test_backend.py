@@ -627,8 +627,8 @@ class IdentityTests(object):
         expected_member_assignments = orig_member_assignments + [{
             'group_id': new_group['id'], 'project_id': new_project['id'],
             'role_id': MEMBER_ROLE_ID}]
-        self.assertThat(new_member_assignments,
-                        matchers.Equals(expected_member_assignments))
+        self.assertItemsEqual(expected_member_assignments,
+                              new_member_assignments)
 
     def test_list_role_assignments_bad_role(self):
         assignment_list = self.assignment_api.list_role_assignments_for_role(
@@ -2899,7 +2899,7 @@ class IdentityTests(object):
                         'enabled': True,
                         'parent_id': root_project['id']}
 
-        self.assertRaises(exception.ForbiddenAction,
+        self.assertRaises(exception.ValidationError,
                           self.resource_api.create_project,
                           leaf_project['id'],
                           leaf_project)
@@ -2958,7 +2958,7 @@ class IdentityTests(object):
 
         # It's not possible to create a project under a disabled one in the
         # hierarchy
-        self.assertRaises(exception.ForbiddenAction,
+        self.assertRaises(exception.ValidationError,
                           self.resource_api.create_project,
                           project2['id'],
                           project2)
@@ -4977,7 +4977,6 @@ class CatalogTests(object):
 
         endpoint = {
             'id': uuid.uuid4().hex,
-            'region_id': None,
             'service_id': service['id'],
             'interface': 'public',
             'url': uuid.uuid4().hex,
@@ -5076,6 +5075,29 @@ class CatalogTests(object):
             service_id, region['id'], enabled=False, interface='internal')
 
         return service_ref, enabled_endpoint_ref, disabled_endpoint_ref
+
+    def test_list_endpoints(self):
+        service = {
+            'id': uuid.uuid4().hex,
+            'type': uuid.uuid4().hex,
+            'name': uuid.uuid4().hex,
+            'description': uuid.uuid4().hex,
+        }
+        self.catalog_api.create_service(service['id'], service.copy())
+
+        expected_ids = set([uuid.uuid4().hex for _ in range(3)])
+        for endpoint_id in expected_ids:
+            endpoint = {
+                'id': endpoint_id,
+                'region_id': None,
+                'service_id': service['id'],
+                'interface': 'public',
+                'url': uuid.uuid4().hex,
+            }
+            self.catalog_api.create_endpoint(endpoint['id'], endpoint.copy())
+
+        endpoints = self.catalog_api.list_endpoints()
+        self.assertEqual(expected_ids, set(e['id'] for e in endpoints))
 
     def test_get_catalog_endpoint_disabled(self):
         """Get back only enabled endpoints when get the v2 catalog."""
@@ -5837,6 +5859,31 @@ class FilterTests(filtering.FilterTests):
         hints.add_filter('name', value)
         users = self.identity_api.list_users(hints=hints)
         self.assertEqual([], users)
+
+    def test_list_users_in_group_filtered(self):
+        number_of_users = 10
+        user_name_data = {
+            1: 'Arthur Conan Doyle',
+            3: 'Arthur Rimbaud',
+            9: 'Arthur Schopenhauer',
+        }
+        user_list = self._create_test_data(
+            'user', number_of_users,
+            domain_id=DEFAULT_DOMAIN_ID, name_dict=user_name_data)
+        group = self._create_one_entity('group',
+                                        DEFAULT_DOMAIN_ID, 'Great Writers')
+        for i in range(7):
+            self.identity_api.add_user_to_group(user_list[i]['id'],
+                                                group['id'])
+
+        hints = driver_hints.Hints()
+        hints.add_filter('name', 'Arthur', comparator='startswith')
+        users = self.identity_api.list_users_in_group(group['id'], hints=hints)
+        self.assertThat(len(users), matchers.Equals(2))
+        self.assertIn(user_list[1]['id'], [users[0]['id'], users[1]['id']])
+        self.assertIn(user_list[3]['id'], [users[0]['id'], users[1]['id']])
+        self._delete_test_data('user', user_list)
+        self._delete_entity('group')(group['id'])
 
 
 class LimitTests(filtering.FilterTests):

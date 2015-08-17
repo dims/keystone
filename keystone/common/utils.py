@@ -32,6 +32,7 @@ import passlib.hash
 import six
 from six import moves
 
+from keystone.common import authorization
 from keystone import exception
 from keystone.i18n import _, _LE, _LW
 
@@ -82,7 +83,7 @@ class SmarterEncoder(jsonutils.json.JSONEncoder):
     """Help for JSON encoding dict-like objects."""
     def default(self, obj):
         if not isinstance(obj, dict) and hasattr(obj, 'iteritems'):
-            return dict(six.iteritems(obj))
+            return dict(obj.iteritems())
         return super(SmarterEncoder, self).default(obj)
 
 
@@ -245,7 +246,7 @@ def setup_remote_pydev_debug():
 
 
 def get_unix_user(user=None):
-    '''Get the uid and user name.
+    """Get the uid and user name.
 
     This is a convenience utility which accepts a variety of input
     which might represent a unix user. If successful it returns the uid
@@ -258,7 +259,7 @@ def get_unix_user(user=None):
         lookup as a uid.
 
     int
-        An integer is interpretted as a uid.
+        An integer is interpreted as a uid.
 
     None
         None is interpreted to mean use the current process's
@@ -271,7 +272,8 @@ def get_unix_user(user=None):
                         lookup.
 
     :return: tuple of (uid, name)
-    '''
+
+    """
 
     if isinstance(user, six.string_types):
         try:
@@ -300,7 +302,7 @@ def get_unix_user(user=None):
 
 
 def get_unix_group(group=None):
-    '''Get the gid and group name.
+    """Get the gid and group name.
 
     This is a convenience utility which accepts a variety of input
     which might represent a unix group. If successful it returns the gid
@@ -313,7 +315,7 @@ def get_unix_group(group=None):
         lookup as a gid.
 
     int
-        An integer is interpretted as a gid.
+        An integer is interpreted as a gid.
 
     None
         None is interpreted to mean use the current process's
@@ -327,7 +329,8 @@ def get_unix_group(group=None):
                          lookup.
 
     :return: tuple of (gid, name)
-    '''
+
+    """
 
     if isinstance(group, six.string_types):
         try:
@@ -358,7 +361,7 @@ def get_unix_group(group=None):
 
 
 def set_permissions(path, mode=None, user=None, group=None, log=None):
-    '''Set the ownership and permissions on the pathname.
+    """Set the ownership and permissions on the pathname.
 
     Each of the mode, user and group are optional, if None then
     that aspect is not modified.
@@ -375,7 +378,8 @@ def set_permissions(path, mode=None, user=None, group=None, log=None):
                          if None do not set.
     :param logger log: logging.logger object, used to emit log messages,
                        if None no logging is performed.
-    '''
+
+    """
 
     if user is None:
         user_uid, user_name = None, None
@@ -421,7 +425,7 @@ def set_permissions(path, mode=None, user=None, group=None, log=None):
 
 
 def make_dirs(path, mode=None, user=None, group=None, log=None):
-    '''Assure directory exists, set ownership and permissions.
+    """Assure directory exists, set ownership and permissions.
 
     Assure the directory exists and optionally set its ownership
     and permissions.
@@ -441,7 +445,8 @@ def make_dirs(path, mode=None, user=None, group=None, log=None):
                          if None do not set.
     :param logger log: logging.logger object, used to emit log messages,
                        if None no logging is performed.
-    '''
+
+    """
 
     if log:
         if mode is None:
@@ -504,3 +509,20 @@ def isotime(at=None, subsecond=False):
 def strtime():
     at = timeutils.utcnow()
     return at.strftime(timeutils.PERFECT_TIME_FORMAT)
+
+
+def get_token_ref(context):
+    """Retrieves KeystoneToken object from the auth context and returns it.
+
+    :param dict context: The request context.
+    :raises: exception.Unauthorized if auth context cannot be found.
+    :returns: The KeystoneToken object.
+    """
+    try:
+        # Retrieve the auth context that was prepared by AuthContextMiddleware.
+        auth_context = (context['environment']
+                        [authorization.AUTH_CONTEXT_ENV])
+        return auth_context['token']
+    except KeyError:
+        LOG.warning(_LW("Couldn't find the auth context."))
+        raise exception.Unauthorized()

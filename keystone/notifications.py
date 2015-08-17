@@ -15,6 +15,7 @@
 """Notifications module for OpenStack Identity Service resources"""
 
 import collections
+import functools
 import inspect
 import logging
 import socket
@@ -56,6 +57,7 @@ _ACTIONS = collections.namedtuple(
     'created, deleted, disabled, updated, internal')
 ACTIONS = _ACTIONS(created='created', deleted='deleted', disabled='disabled',
                    updated='updated', internal='internal')
+"""The actions on resources."""
 
 CADF_TYPE_MAP = {
     'group': taxonomy.SECURITY_GROUP,
@@ -290,6 +292,54 @@ def register_event_callback(event, resource_type, callbacks):
             callback_str = '.'.join(i for i in callback_info if i is not None)
             event_str = '.'.join(['identity', resource_type, event])
             LOG.debug(msg, {'callback': callback_str, 'event': event_str})
+
+
+def listener(cls):
+    """A class decorator to declare a class to be a notification listener.
+
+    A notification listener must specify the event(s) it is interested in by
+    defining a ``event_callbacks`` attribute or property. ``event_callbacks``
+    is a dictionary where the key is the type of event and the value is a
+    dictionary containing a mapping of resource types to callback(s).
+
+    :data:`.ACTIONS` contains constants for the currently
+    supported events. There is currently no single place to find constants for
+    the resource types.
+
+    Example::
+
+        @listener
+        class Something(object):
+
+            def __init__(self):
+                self.event_callbacks = {
+                    notifications.ACTIONS.created: {
+                        'user': self._user_created_callback,
+                    },
+                    notifications.ACTIONS.deleted: {
+                        'project': [
+                            self._project_deleted_callback,
+                            self._do_cleanup,
+                        ]
+                    },
+                }
+
+    """
+
+    def init_wrapper(init):
+        @functools.wraps(init)
+        def __new_init__(self, *args, **kwargs):
+            init(self, *args, **kwargs)
+            _register_event_callbacks(self)
+        return __new_init__
+
+    def _register_event_callbacks(self):
+        for event, resource_types in self.event_callbacks.items():
+            for resource_type, callbacks in resource_types.items():
+                register_event_callback(event, resource_type, callbacks)
+
+    cls.__init__ = init_wrapper(cls.__init__)
+    return cls
 
 
 def notify_event_callbacks(service, resource_type, operation, payload):

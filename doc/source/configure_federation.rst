@@ -56,14 +56,18 @@ To enable federation, you'll need to:
 Configure Apache to use a federation capable authentication method
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There are many ways to configure Federation in the Apache HTTPD server.
-Using Shibboleth and OpenID Connect are documented so far.
+There is currently support for two major federation protocols:
 
-* To use Shibboleth, follow the steps outlined at: `Setup Shibboleth`_.
-* To use OpenID Connect, follow the steps outlined at: `Setup OpenID Connect`_.
+* SAML - Keystone supports the following implementations:
+
+  * Shibboleth - see `Setup Shibboleth`_.
+  * Mellon - see `Setup Mellon`_.
+
+* OpenID Connect - see `Setup OpenID Connect`_.
 
 .. _`Setup Shibboleth`: federation/shibboleth.html
 .. _`Setup OpenID Connect`: federation/openidc.html
+.. _`Setup Mellon`: federation/mellon.html
 
 Configure keystone and Horizon for Single Sign-On
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,8 +147,10 @@ A mapping is a list of rules. The only Identity API objects that will support ma
 and users.
 
 Mapping adds a set of rules to map federation protocol attributes to Identity API objects.
-An Identity Provider has exactly one mapping specified per protocol.
+There are many different ways to setup as well as combine these rules. More information on
+rules can be found on the :doc:`mapping_combinations` page.
 
+An Identity Provider has exactly one mapping specified per protocol.
 Mapping objects can be used multiple times by different combinations of Identity Provider and Protocol.
 
 More information on mapping can be found `here
@@ -295,7 +301,7 @@ also be setup. It is recommended that these values be URL safe.
     idp_organization_display_name=Example Corp.
     idp_organization_url=example.com
 
-As with the Organizaion options, the Contact options, are not necessary, but
+As with the Organization options, the Contact options, are not necessary, but
 it's advisable to set these values too.
 
 .. code-block:: ini

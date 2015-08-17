@@ -14,13 +14,12 @@
 from __future__ import absolute_import
 import uuid
 
-import ldap
 import ldap.filter
 from oslo_config import cfg
 from oslo_log import log
 import six
 
-from keystone import clean
+from keystone.common import clean
 from keystone.common import driver_hints
 from keystone.common import ldap as common_ldap
 from keystone.common import models

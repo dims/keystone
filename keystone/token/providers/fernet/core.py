@@ -14,7 +14,8 @@ from oslo_config import cfg
 from oslo_log import log
 
 from keystone.common import dependency
-from keystone.contrib import federation
+from keystone.common import utils as ks_utils
+from keystone.contrib.federation import constants as federation_constants
 from keystone import exception
 from keystone.i18n import _
 from keystone.token import provider
@@ -87,11 +88,33 @@ class Provider(common.BaseProvider):
                                                      audit_ids,
                                                      methods=method_names,
                                                      project_id=project_id)
+        self._build_issued_at_info(token_id, v3_token_data)
         # Convert v3 to v2 token data and build v2 catalog
         token_data = self.v2_token_data_helper.v3_to_v2_token(token_id,
                                                               v3_token_data)
 
         return token_id, token_data
+
+    def issue_v3_token(self, *args, **kwargs):
+        token_id, token_data = super(Provider, self).issue_v3_token(
+            *args, **kwargs)
+        self._build_issued_at_info(token_id, token_data)
+        return token_id, token_data
+
+    def _build_issued_at_info(self, token_id, token_data):
+        # NOTE(roxanaghe, lbragstad): We must use the creation time that
+        # Fernet builds into it's token. The Fernet spec details that the
+        # token creation time is built into the token, outside of the payload
+        # provided by Keystone. This is the reason why we don't pass the
+        # issued_at time in the payload. This also means that we shouldn't
+        # return a token reference with a creation time that we created
+        # when Fernet uses a different creation time. We should use the
+        # creation time provided by Fernet because it's the creation time
+        # that we have to rely on when we validate the token.
+        fernet_creation_datetime_obj = self.token_formatter.creation_time(
+            token_id)
+        token_data['token']['issued_at'] = ks_utils.isotime(
+            at=fernet_creation_datetime_obj, subsecond=True)
 
     def _build_federated_info(self, token_data):
         """Extract everything needed for federated tokens.
@@ -101,11 +124,12 @@ class Provider(common.BaseProvider):
 
         """
         group_ids = token_data['token'].get('user', {}).get(
-            federation.FEDERATION, {}).get('groups')
+            federation_constants.FEDERATION, {}).get('groups')
         idp_id = token_data['token'].get('user', {}).get(
-            federation.FEDERATION, {}).get('identity_provider', {}).get('id')
+            federation_constants.FEDERATION, {}).get(
+                'identity_provider', {}).get('id')
         protocol_id = token_data['token'].get('user', {}).get(
-            federation.FEDERATION, {}).get('protocol', {}).get('id')
+            federation_constants.FEDERATION, {}).get('protocol', {}).get('id')
         if not group_ids:
             group_ids = list()
         if group_ids:
@@ -130,7 +154,8 @@ class Provider(common.BaseProvider):
         federated_info = dict(groups=g_ids,
                               identity_provider=dict(id=idp_id),
                               protocol=dict(id=protocol_id))
-        token_dict = {'user': {federation.FEDERATION: federated_info}}
+        token_dict = {'user': {
+            federation_constants.FEDERATION: federated_info}}
         token_dict['user']['id'] = user_id
         token_dict['user']['name'] = user_id
         return token_dict
@@ -140,14 +165,18 @@ class Provider(common.BaseProvider):
 
         :param token_ref: reference describing the token to validate
         :returns: the token data
+        :raises keystone.exception.TokenNotFound: if token format is invalid
         :raises keystone.exception.Unauthorized: if v3 token is used
 
         """
-        (user_id, methods,
-         audit_ids, domain_id,
-         project_id, trust_id,
-         federated_info, created_at,
-         expires_at) = self.token_formatter.validate_token(token_ref)
+        try:
+            (user_id, methods,
+             audit_ids, domain_id,
+             project_id, trust_id,
+             federated_info, created_at,
+             expires_at) = self.token_formatter.validate_token(token_ref)
+        except exception.ValidationError as e:
+            raise exception.TokenNotFound(e)
 
         if trust_id or domain_id or federated_info:
             msg = _('This is not a v2.0 Fernet token. Use v3 for trust, '
@@ -171,13 +200,16 @@ class Provider(common.BaseProvider):
 
         :param token: a string describing the token to validate
         :returns: the token data
-        :raises keystone.exception.Unauthorized: if token format version isn't
+        :raises keystone.exception.TokenNotFound: if token format version isn't
                                                  supported
 
         """
-        (user_id, methods, audit_ids, domain_id, project_id, trust_id,
-            federated_info, created_at, expires_at) = (
-                self.token_formatter.validate_token(token))
+        try:
+            (user_id, methods, audit_ids, domain_id, project_id, trust_id,
+                federated_info, created_at, expires_at) = (
+                    self.token_formatter.validate_token(token))
+        except exception.ValidationError as e:
+            raise exception.TokenNotFound(e)
 
         token_dict = None
         trust_ref = None

@@ -15,7 +15,6 @@
 import subprocess
 import uuid
 
-import ldap
 import ldap.modlist
 from oslo_config import cfg
 from six.moves import range
@@ -89,9 +88,6 @@ class LiveLDAPIdentity(test_backend_ldap.LDAPIdentity):
         user_api = identity_ldap.UserApi(CONF)
         self.assertTrue(user_api)
         self.assertEqual(user_api.tree_dn, CONF.ldap.user_tree_dn)
-
-    def tearDown(self):
-        tests.TestCase.tearDown(self)
 
     def test_ldap_dereferencing(self):
         alt_users_ldif = {'objectclass': ['top', 'organizationalUnit'],
