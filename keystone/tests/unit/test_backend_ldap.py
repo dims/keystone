@@ -20,6 +20,7 @@ import uuid
 import ldap
 import mock
 from oslo_config import cfg
+import pkg_resources
 from six.moves import range
 from testtools import matchers
 
@@ -32,13 +33,77 @@ from keystone.identity.mapping_backends import mapping as map
 from keystone import resource
 from keystone.tests import unit as tests
 from keystone.tests.unit import default_fixtures
-from keystone.tests.unit import fakeldap
 from keystone.tests.unit import identity_mapping as mapping_sql
 from keystone.tests.unit.ksfixtures import database
+from keystone.tests.unit.ksfixtures import ldapdb
 from keystone.tests.unit import test_backend
 
 
 CONF = cfg.CONF
+
+
+def _assert_backends(testcase, **kwargs):
+
+    def _get_backend_cls(testcase, subsystem):
+        observed_backend = getattr(testcase, subsystem + '_api').driver
+        return observed_backend.__class__
+
+    def _get_domain_specific_backend_cls(manager, domain):
+        observed_backend = manager.domain_configs.get_domain_driver(domain)
+        return observed_backend.__class__
+
+    def _get_entrypoint_cls(subsystem, name):
+        entrypoint = entrypoint_map['keystone.' + subsystem][name]
+        return entrypoint.resolve()
+
+    def _load_domain_specific_configs(manager):
+        if (not manager.domain_configs.configured and
+                CONF.identity.domain_specific_drivers_enabled):
+            manager.domain_configs.setup_domain_drivers(
+                manager.driver, manager.resource_api)
+
+    def _assert_equal(expected_cls, observed_cls, subsystem,
+                      domain=None):
+        msg = ('subsystem %(subsystem)s expected %(expected_cls)r, '
+               'but observed %(observed_cls)r')
+        if domain:
+            subsystem = '%s[domain=%s]' % (subsystem, domain)
+        assert expected_cls == observed_cls, msg % {
+            'expected_cls': expected_cls,
+            'observed_cls': observed_cls,
+            'subsystem': subsystem,
+        }
+
+    env = pkg_resources.Environment()
+    keystone_dist = env['keystone'][0]
+    entrypoint_map = pkg_resources.get_entry_map(keystone_dist)
+
+    for subsystem, entrypoint_name in kwargs.items():
+        if isinstance(entrypoint_name, str):
+            observed_cls = _get_backend_cls(testcase, subsystem)
+            expected_cls = _get_entrypoint_cls(subsystem, entrypoint_name)
+            _assert_equal(expected_cls, observed_cls, subsystem)
+
+        elif isinstance(entrypoint_name, dict):
+            manager = getattr(testcase, subsystem + '_api')
+            _load_domain_specific_configs(manager)
+
+            for domain, entrypoint_name in entrypoint_name.items():
+                if domain is None:
+                    observed_cls = _get_backend_cls(testcase, subsystem)
+                    expected_cls = _get_entrypoint_cls(
+                        subsystem, entrypoint_name)
+                    _assert_equal(expected_cls, observed_cls, subsystem)
+                    continue
+
+                observed_cls = _get_domain_specific_backend_cls(
+                    manager, domain)
+                expected_cls = _get_entrypoint_cls(subsystem, entrypoint_name)
+                _assert_equal(expected_cls, observed_cls, subsystem, domain)
+
+        else:
+            raise ValueError('%r is not an expected value for entrypoint name'
+                             % entrypoint_name)
 
 
 def create_group_container(identity_api):
@@ -54,25 +119,14 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
 
     def setUp(self):
         super(BaseLDAPIdentity, self).setUp()
-        self.clear_database()
+        self.ldapdb = self.useFixture(ldapdb.LDAPDatabase())
 
-        common_ldap.register_handler('fake://', fakeldap.FakeLdap)
         self.load_backends()
         self.load_fixtures(default_fixtures)
-
-        self.addCleanup(common_ldap_core._HANDLERS.clear)
 
     def _get_domain_fixture(self):
         """Domains in LDAP are read-only, so just return the static one."""
         return self.resource_api.get_domain(CONF.identity.default_domain_id)
-
-    def clear_database(self):
-        for shelf in fakeldap.FakeShelves:
-            fakeldap.FakeShelves[shelf].clear()
-
-    def reload_backends(self, domain_id):
-        # Only one backend unless we are using separate domain backends
-        self.load_backends()
 
     def get_config(self, domain_id):
         # Only one conf structure unless we are using separate domain backends
@@ -125,11 +179,11 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
                           user['id'])
 
     def test_configurable_forbidden_user_actions(self):
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_allow_create = False
-        conf.ldap.user_allow_update = False
-        conf.ldap.user_allow_delete = False
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.allow_create = False
+        driver.user.allow_update = False
+        driver.user.allow_delete = False
 
         user = {'name': u'fäké1',
                 'password': u'fäképass1',
@@ -150,9 +204,9 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
                           self.user_foo['id'])
 
     def test_configurable_forbidden_create_existing_user(self):
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_allow_create = False
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.allow_create = False
 
         self.assertRaises(exception.ForbiddenAction,
                           self.identity_api.create_user,
@@ -163,9 +217,9 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
         self.user_foo.pop('password')
         self.assertDictEqual(user_ref, self.user_foo)
 
-        conf = self.get_config(user_ref['domain_id'])
-        conf.ldap.user_filter = '(CN=DOES_NOT_MATCH)'
-        self.reload_backends(user_ref['domain_id'])
+        driver = self.identity_api._select_identity_driver(
+            user_ref['domain_id'])
+        driver.user.ldap_filter = '(CN=DOES_NOT_MATCH)'
         # invalidate the cache if the result is cached.
         self.identity_api.get_user.invalidate(self.identity_api,
                                               self.user_foo['id'])
@@ -468,7 +522,7 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
 
     def test_list_role_assignments_dumb_member(self):
         self.config_fixture.config(group='ldap', use_dumb_member=True)
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
 
@@ -493,7 +547,7 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
 
     def test_list_user_ids_for_project_dumb_member(self):
         self.config_fixture.config(group='ldap', use_dumb_member=True)
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
 
@@ -567,7 +621,7 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
 
     def test_list_group_members_dumb_member(self):
         self.config_fixture.config(group='ldap', use_dumb_member=True)
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
 
@@ -684,11 +738,10 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
     def test_create_user_none_mapping(self):
         # When create a user where an attribute maps to None, the entry is
         # created without that attribute and it doesn't fail with a TypeError.
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_attribute_ignore = ['enabled', 'email',
-                                           'tenants', 'tenantId']
-        self.reload_backends(CONF.identity.default_domain_id)
-
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.attribute_ignore = ['enabled', 'email',
+                                        'tenants', 'tenantId']
         user = {'name': u'fäké1',
                 'password': u'fäképass1',
                 'domain_id': CONF.identity.default_domain_id,
@@ -721,10 +774,10 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
         # Ensure that an attribute that maps to None that is not explicitly
         # ignored in configuration is implicitly ignored without triggering
         # an error.
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_attribute_ignore = ['enabled', 'email',
-                                           'tenants', 'tenantId']
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.attribute_ignore = ['enabled', 'email',
+                                        'tenants', 'tenantId']
 
         user = {'name': u'fäké1',
                 'password': u'fäképass1',
@@ -928,6 +981,10 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
         # credentials) that require a database.
         self.useFixture(database.Database())
         super(LDAPIdentity, self).setUp()
+        _assert_backends(self,
+                         assignment='ldap',
+                         identity='ldap',
+                         resource='ldap')
 
     def load_fixtures(self, fixtures):
         # Override super impl since need to create group container.
@@ -1030,7 +1087,7 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
 
     def test_dumb_member(self):
         self.config_fixture.config(group='ldap', use_dumb_member=True)
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
         dumb_id = common_ldap.BaseLdap._dn_to_id(CONF.ldap.dumb_member)
@@ -1043,7 +1100,7 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
             group='ldap', project_name_attribute='ou',
             project_desc_attribute='description',
             project_enabled_attribute='enabled')
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
         # NOTE(morganfainberg): CONF.ldap.project_name_attribute,
@@ -1088,7 +1145,7 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
         self.config_fixture.config(
             group='ldap',
             project_attribute_ignore=['name', 'description', 'enabled'])
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
         # NOTE(morganfainberg): CONF.ldap.project_attribute_ignore will not be
@@ -1108,7 +1165,7 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
     def test_user_enable_attribute_mask(self):
         self.config_fixture.config(group='ldap', user_enabled_mask=2,
                                    user_enabled_default='512')
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
 
@@ -1156,7 +1213,7 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
     def test_user_enabled_invert(self):
         self.config_fixture.config(group='ldap', user_enabled_invert=True,
                                    user_enabled_default=False)
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
 
@@ -1426,6 +1483,26 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
 
         new_user = [u for u in res if u['id'] == user['id']][0]
         self.assertThat(new_user['description'], matchers.Equals(description))
+
+    def test_user_with_missing_id(self):
+        # create a user that doesn't have the id attribute
+        ldap_ = self.identity_api.driver.user.get_connection()
+        # `sn` is used for the attribute in the DN because it's allowed by
+        # the entry's objectclasses so that this test could conceivably run in
+        # the live tests.
+        ldap_id_field = 'sn'
+        ldap_id_value = uuid.uuid4().hex
+        dn = '%s=%s,ou=Users,cn=example,cn=com' % (ldap_id_field,
+                                                   ldap_id_value)
+        modlist = [('objectClass', ['person', 'inetOrgPerson']),
+                   (ldap_id_field, [ldap_id_value]),
+                   ('mail', ['email@example.com']),
+                   ('userPassword', [uuid.uuid4().hex])]
+        ldap_.add_s(dn, modlist)
+
+        # make sure the user doesn't break other users
+        users = self.identity_api.driver.user.get_all()
+        self.assertThat(users, matchers.HasLength(len(default_fixtures.USERS)))
 
     @mock.patch.object(common_ldap_core.BaseLdap, '_ldap_get')
     def test_user_mixed_case_attribute(self, mock_ldap_get):
@@ -1865,9 +1942,9 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
         self.assertEqual(set(expected_group_ids), group_ids)
 
     def test_user_id_attribute_in_create(self):
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_id_attribute = 'mail'
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.id_attr = 'mail'
 
         user = {'name': u'fäké1',
                 'password': u'fäképass1',
@@ -1879,9 +1956,9 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
         self.assertEqual(user_ref['id'], user_ref['email'])
 
     def test_user_id_attribute_map(self):
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_id_attribute = 'mail'
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.id_attr = 'mail'
 
         user_ref = self.identity_api.get_user(self.user_foo['email'])
         # the user_id_attribute map should be honored, which means
@@ -1890,9 +1967,9 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
 
     @mock.patch.object(common_ldap_core.BaseLdap, '_ldap_get')
     def test_get_id_from_dn_for_multivalued_attribute_id(self, mock_ldap_get):
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_id_attribute = 'mail'
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.id_attr = 'mail'
 
         # make 'email' multivalued so we can test the error condition
         email1 = uuid.uuid4().hex
@@ -1927,10 +2004,10 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
 
     @mock.patch.object(common_ldap_core.BaseLdap, '_ldap_get')
     def test_user_id_not_in_dn(self, mock_ldap_get):
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_id_attribute = 'uid'
-        conf.ldap.user_name_attribute = 'cn'
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.id_attr = 'uid'
+        driver.user.attribute_mapping['name'] = 'cn'
 
         mock_ldap_get.return_value = (
             'foo=bar,dc=example,dc=com',
@@ -1947,10 +2024,10 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
 
     @mock.patch.object(common_ldap_core.BaseLdap, '_ldap_get')
     def test_user_name_in_dn(self, mock_ldap_get):
-        conf = self.get_config(CONF.identity.default_domain_id)
-        conf.ldap.user_id_attribute = 'sAMAccountName'
-        conf.ldap.user_name_attribute = 'cn'
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.id_attr = 'SAMAccountName'
+        driver.user.attribute_mapping['name'] = 'cn'
 
         mock_ldap_get.return_value = (
             'cn=Foo Bar,dc=example,dc=com',
@@ -1968,12 +2045,16 @@ class LDAPIdentity(BaseLDAPIdentity, tests.TestCase):
 class LDAPIdentityEnabledEmulation(LDAPIdentity):
     def setUp(self):
         super(LDAPIdentityEnabledEmulation, self).setUp()
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
         for obj in [self.tenant_bar, self.tenant_baz, self.user_foo,
                     self.user_two, self.user_badguy]:
             obj.setdefault('enabled', True)
+        _assert_backends(self,
+                         assignment='ldap',
+                         identity='ldap',
+                         resource='ldap')
 
     def load_fixtures(self, fixtures):
         # Override super impl since need to create group container.
@@ -2047,9 +2128,9 @@ class LDAPIdentityEnabledEmulation(LDAPIdentity):
                           user['id'])
 
     def test_user_auth_emulated(self):
-        self.config_fixture.config(group='ldap',
-                                   user_enabled_emulation_dn='cn=test,dc=test')
-        self.reload_backends(CONF.identity.default_domain_id)
+        driver = self.identity_api._select_identity_driver(
+            CONF.identity.default_domain_id)
+        driver.user.enabled_emulation_dn = 'cn=test,dc=test'
         self.identity_api.authenticate(
             context={},
             user_id=self.user_foo['id'],
@@ -2062,7 +2143,7 @@ class LDAPIdentityEnabledEmulation(LDAPIdentity):
     def test_user_enabled_invert(self):
         self.config_fixture.config(group='ldap', user_enabled_invert=True,
                                    user_enabled_default=False)
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         self.load_fixtures(default_fixtures)
 
@@ -2152,7 +2233,7 @@ class LdapIdentitySqlAssignment(BaseLDAPIdentity, tests.SQLDriverOverrides,
     def setUp(self):
         sqldb = self.useFixture(database.Database())
         super(LdapIdentitySqlAssignment, self).setUp()
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_backends()
         cache.configure_cache_region(cache.REGION)
 
@@ -2160,6 +2241,10 @@ class LdapIdentitySqlAssignment(BaseLDAPIdentity, tests.SQLDriverOverrides,
         self.load_fixtures(default_fixtures)
         # defaulted by the data load
         self.user_foo['enabled'] = True
+        _assert_backends(self,
+                         assignment='sql',
+                         identity='ldap',
+                         resource='sql')
 
     def config_overrides(self):
         super(LdapIdentitySqlAssignment, self).config_overrides()
@@ -2435,9 +2520,21 @@ class MultiLDAPandSQLIdentity(BaseLDAPIdentity, tests.SQLDriverOverrides,
         # for separate backends per domain.
         self.enable_multi_domain()
 
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_fixtures(default_fixtures)
         self.create_users_across_domains()
+        self.assert_backends()
+
+    def assert_backends(self):
+        _assert_backends(self,
+                         assignment='sql',
+                         identity={
+                             None: 'sql',
+                             self.domains['domain_default']['id']: 'ldap',
+                             self.domains['domain1']['id']: 'ldap',
+                             self.domains['domain2']['id']: 'ldap',
+                         },
+                         resource='sql')
 
     def config_overrides(self):
         super(MultiLDAPandSQLIdentity, self).config_overrides()
@@ -2471,11 +2568,6 @@ class MultiLDAPandSQLIdentity(BaseLDAPIdentity, tests.SQLDriverOverrides,
             domain_config_dir=tests.TESTCONF + '/domain_configs_multi_ldap')
         self.config_fixture.config(group='identity_mapping',
                                    backward_compatible_ids=False)
-
-    def reload_backends(self, domain_id):
-        # Just reload the driver for this domain - which will pickup
-        # any updated cfg
-        self.identity_api.domain_configs.reload_domain_driver(domain_id)
 
     def get_config(self, domain_id):
         # Get the config for this domain, will return CONF
@@ -2682,6 +2774,18 @@ class MultiLDAPandSQLIdentityDomainConfigsInSQL(MultiLDAPandSQLIdentity):
     database.
 
     """
+
+    def assert_backends(self):
+        _assert_backends(self,
+                         assignment='sql',
+                         identity={
+                             None: 'sql',
+                             self.domains['domain_default']['id']: 'ldap',
+                             self.domains['domain1']['id']: 'ldap',
+                             self.domains['domain2']['id']: 'ldap',
+                         },
+                         resource='sql')
+
     def enable_multi_domain(self):
         # The values below are the same as in the domain_configs_multi_ldap
         # cdirectory of test config_files.
@@ -2824,9 +2928,19 @@ class DomainSpecificLDAPandSQLIdentity(
         self.setup_initial_domains()
         self.users = {}
 
-        self.clear_database()
+        self.ldapdb.clear()
         self.load_fixtures(default_fixtures)
         self.create_users_across_domains()
+
+        _assert_backends(
+            self,
+            assignment='sql',
+            identity={
+                None: 'ldap',
+                'default': 'ldap',
+                self.domains['domain1']['id']: 'sql',
+            },
+            resource='sql')
 
     def config_overrides(self):
         super(DomainSpecificLDAPandSQLIdentity, self).config_overrides()
@@ -2834,11 +2948,6 @@ class DomainSpecificLDAPandSQLIdentity(
         # BaseLDAPIdentity causes this option to use LDAP.
         self.config_fixture.config(group='resource', driver='sql')
         self.config_fixture.config(group='assignment', driver='sql')
-
-    def reload_backends(self, domain_id):
-        # Just reload the driver for this domain - which will pickup
-        # any updated cfg
-        self.identity_api.domain_configs.reload_domain_driver(domain_id)
 
     def get_config(self, domain_id):
         # Get the config for this domain, will return CONF
@@ -2979,6 +3088,11 @@ class DomainSpecificSQLIdentity(DomainSpecificLDAPandSQLIdentity):
         self.load_fixtures(default_fixtures)
         self.create_users_across_domains()
 
+        _assert_backends(self,
+                         assignment='sql',
+                         identity='ldap',
+                         resource='sql')
+
     def config_overrides(self):
         super(DomainSpecificSQLIdentity, self).config_overrides()
         self.config_fixture.config(group='identity', driver='ldap')
@@ -2990,14 +3104,6 @@ class DomainSpecificSQLIdentity(DomainSpecificLDAPandSQLIdentity):
             return CONF
         else:
             return self.identity_api.domain_configs.get_domain_conf(domain_id)
-
-    def reload_backends(self, domain_id):
-        if domain_id == CONF.identity.default_domain_id:
-            self.load_backends()
-        else:
-            # Just reload the driver for this domain - which will pickup
-            # any updated cfg
-            self.identity_api.domain_configs.reload_domain_driver(domain_id)
 
     def test_default_sql_plus_sql_specific_driver_fails(self):
         # First confirm that if ldap is default driver, domain1 can be
@@ -3050,14 +3156,12 @@ class LdapFilterTests(test_backend.FilterTests, tests.TestCase):
     def setUp(self):
         super(LdapFilterTests, self).setUp()
         sqldb = self.useFixture(database.Database())
-        self.clear_database()
+        self.useFixture(ldapdb.LDAPDatabase())
 
-        common_ldap.register_handler('fake://', fakeldap.FakeLdap)
         self.load_backends()
         self.load_fixtures(default_fixtures)
         sqldb.recreate()
-
-        self.addCleanup(common_ldap_core._HANDLERS.clear)
+        _assert_backends(self, assignment='ldap', identity='ldap')
 
     def config_overrides(self):
         super(LdapFilterTests, self).config_overrides()
@@ -3067,10 +3171,6 @@ class LdapFilterTests(test_backend.FilterTests, tests.TestCase):
         config_files = super(LdapFilterTests, self).config_files()
         config_files.append(tests.dirs.tests_conf('backend_ldap.conf'))
         return config_files
-
-    def clear_database(self):
-        for shelf in fakeldap.FakeShelves:
-            fakeldap.FakeShelves[shelf].clear()
 
     def test_list_users_in_group_filtered(self):
         # The LDAP identity driver currently does not support filtering on the

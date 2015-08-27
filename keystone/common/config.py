@@ -79,7 +79,7 @@ FILE_OPTIONS = {
         # static and grows over time to constantly approximate ~300ms
         # of CPU time to hash; this was considered too high.  This
         # value still exceeds the glibc default of 5k.
-        cfg.IntOpt('crypt_strength', default=10000,
+        cfg.IntOpt('crypt_strength', default=10000, min=1000, max=100000,
                    help='The value passed as the keyword "rounds" to '
                         'passlib\'s encrypt method.'),
         cfg.IntOpt('list_limit',
@@ -149,7 +149,8 @@ FILE_OPTIONS = {
         cfg.StrOpt('driver',
                    default='sql',
                    help='Entrypoint for the identity backend driver in the '
-                        'keystone.identity namespace.'),
+                        'keystone.identity namespace. Supplied drivers are '
+                        'ldap and sql.'),
         cfg.BoolOpt('caching', default=True,
                     help='Toggle for identity caching. This has no '
                          'effect unless global caching is enabled.'),
@@ -253,7 +254,9 @@ FILE_OPTIONS = {
         cfg.StrOpt('driver',
                    default='sql',
                    help='Entrypoint for the token persistence backend driver '
-                        'in the keystone.token.persistence namespace.'),
+                        'in the keystone.token.persistence namespace. '
+                        'Supplied drivers are kvs, memcache, memcache_pool, '
+                        'and sql.'),
         cfg.BoolOpt('caching', default=True,
                     help='Toggle for token system caching. This has no '
                          'effect unless global caching is enabled.'),
@@ -286,7 +289,7 @@ FILE_OPTIONS = {
                    default='sql',
                    help='Entrypoint for an implementation of the backend for '
                         'persisting revocation events in the keystone.revoke '
-                        'namespace.'),
+                        'namespace. Supplied drivers are kvs and sql.'),
         cfg.IntOpt('expiration_buffer', default=1800,
                    help='This value (calculated in seconds) is added to token '
                         'expiration before a revocation event may be removed '
@@ -381,7 +384,7 @@ FILE_OPTIONS = {
         cfg.StrOpt('ca_key',
                    default='/etc/keystone/ssl/private/cakey.pem',
                    help='Path of the CA key file for SSL.'),
-        cfg.IntOpt('key_size', default=1024,
+        cfg.IntOpt('key_size', default=1024, min=1024,
                    help='SSL key length (in bits) (auto generated '
                         'certificate).'),
         cfg.IntOpt('valid_days', default=3650,
@@ -408,7 +411,7 @@ FILE_OPTIONS = {
         cfg.StrOpt('ca_key',
                    default='/etc/keystone/ssl/private/cakey.pem',
                    help='Path of the CA key for token signing.'),
-        cfg.IntOpt('key_size', default=2048,
+        cfg.IntOpt('key_size', default=2048, min=1024,
                    help='Key size (in bits) for token signing cert '
                         '(auto generated certificate).'),
         cfg.IntOpt('valid_days', default=3650,
@@ -421,19 +424,20 @@ FILE_OPTIONS = {
                         'token signing.'),
     ],
     'assignment': [
-        # assignment has no default for backward compatibility reasons.
-        # If assignment driver is not specified, the identity driver chooses
-        # the backend
         cfg.StrOpt('driver',
                    help='Entrypoint for the assignment backend driver in the '
-                        'keystone.assignment namespace.'),
+                        'keystone.assignment namespace. Supplied drivers are '
+                        'ldap and sql. If an assignment driver is not '
+                        'specified, the identity driver will choose the '
+                        'assignment driver.'),
     ],
     'resource': [
         cfg.StrOpt('driver',
                    help='Entrypoint for the resource backend driver in the '
-                        'keystone.resource namespace. If a resource driver is '
-                        'not specified, the assignment driver will choose '
-                        'the resource driver.'),
+                        'keystone.resource namespace. Supplied drivers are '
+                        'ldap and sql. If a resource driver is not specified, '
+                        'the assignment driver will choose the resource '
+                        'driver.'),
         cfg.BoolOpt('caching', default=True,
                     deprecated_opts=[cfg.DeprecatedOpt('caching',
                                                        group='assignment')],
@@ -469,7 +473,8 @@ FILE_OPTIONS = {
         # the backend
         cfg.StrOpt('driver',
                    help='Entrypoint for the role backend driver in the '
-                        'keystone.role namespace.'),
+                        'keystone.role namespace. Supplied drivers are ldap '
+                        'and sql.'),
         cfg.BoolOpt('caching', default=True,
                     help='Toggle for role caching. This has no effect '
                          'unless global caching is enabled.'),
@@ -534,7 +539,8 @@ FILE_OPTIONS = {
         cfg.StrOpt('driver',
                    default='sql',
                    help='Entrypoint for the policy backend driver in the '
-                        'keystone.policy namespace.'),
+                        'keystone.policy namespace. Supplied drivers are '
+                        'rules and sql.'),
         cfg.IntOpt('list_limit',
                    help='Maximum number of entities that will be returned '
                         'in a policy collection.'),
@@ -882,7 +888,8 @@ FILE_OPTIONS = {
         cfg.StrOpt('external',
                    help='Entrypoint for the external (REMOTE_USER) auth '
                         'plugin module in the keystone.auth.external '
-                        'namespace.'),
+                        'namespace. Supplied drivers are DefaultDomain and '
+                        'Domain. The default driver is DefaultDomain.'),
         cfg.StrOpt('oauth1',
                    help='Entrypoint for the oAuth1.0 auth plugin module in '
                         'the keystone.auth.oauth1 namespace.'),
@@ -933,7 +940,8 @@ FILE_OPTIONS = {
         cfg.StrOpt('driver',
                    default='sql',
                    help='Entrypoint for the catalog backend driver in the '
-                        'keystone.catalog namespace.'),
+                        'keystone.catalog namespace. Supplied drivers are '
+                        'kvs, sql, templated, and endpoint_filter.sql'),
         cfg.BoolOpt('caching', default=True,
                     help='Toggle for catalog caching. This has no '
                          'effect unless global caching is enabled.'),
@@ -1054,7 +1062,8 @@ FILE_OPTIONS = {
                    deprecated_for_removal=True,
                    help='The IP address of the network interface for the '
                         'public service to listen on.'),
-        cfg.IntOpt('public_port', default=5000, deprecated_name='public_port',
+        cfg.IntOpt('public_port', default=5000, min=1, max=65535,
+                   deprecated_name='public_port',
                    deprecated_group='DEFAULT',
                    deprecated_for_removal=True,
                    help='The port number which the public service listens '
@@ -1068,7 +1077,8 @@ FILE_OPTIONS = {
                    deprecated_for_removal=True,
                    help='The IP address of the network interface for the '
                         'admin service to listen on.'),
-        cfg.IntOpt('admin_port', default=35357, deprecated_name='admin_port',
+        cfg.IntOpt('admin_port', default=35357, min=1, max=65535,
+                   deprecated_name='admin_port',
                    deprecated_group='DEFAULT',
                    deprecated_for_removal=True,
                    help='The port number which the admin service listens '
@@ -1160,7 +1170,7 @@ def configure(conf=None):
         cfg.StrOpt('pydev-debug-host',
                    help='Host to connect to for remote debugger.'))
     conf.register_cli_opt(
-        cfg.IntOpt('pydev-debug-port',
+        cfg.IntOpt('pydev-debug-port', min=1, max=65535,
                    help='Port to connect to for remote debugger.'))
 
     for section in FILE_OPTIONS:
