@@ -14,6 +14,7 @@
 
 from oslo_config import cfg
 import oslo_messaging
+import passlib.utils
 
 
 _DEFAULT_AUTH_METHODS = ['external', 'password', 'token', 'oauth1']
@@ -159,6 +160,7 @@ FILE_OPTIONS = {
                         'no effect unless global and identity caching are '
                         'enabled.'),
         cfg.IntOpt('max_password_length', default=4096,
+                   max=passlib.utils.MAX_PASSWORD_SIZE,
                    help='Maximum supported length for user passwords; '
                         'decrease to improve performance.'),
         cfg.IntOpt('list_limit',
@@ -520,9 +522,7 @@ FILE_OPTIONS = {
                         'an admin will not be able to create a domain with '
                         'this name or update an existing domain to this '
                         'name. You are not advised to change this value '
-                        'unless you really have to. Changing this option '
-                        'to empty string or None will not have any impact and '
-                        'default name will be used.'),
+                        'unless you really have to.'),
         cfg.MultiStrOpt('trusted_dashboard', default=[],
                         help='A list of trusted dashboard hosts. Before '
                              'accepting a Single Sign-On request to return a '
