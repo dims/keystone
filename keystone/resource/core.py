@@ -118,7 +118,7 @@ class Manager(manager.Manager):
     def assert_domain_enabled(self, domain_id, domain=None):
         """Assert the Domain is enabled.
 
-        :raise AssertionError if domain is disabled.
+        :raise AssertionError: if domain is disabled.
         """
         if domain is None:
             domain = self.get_domain(domain_id)
@@ -133,7 +133,7 @@ class Manager(manager.Manager):
         If config's option is empty the default hardcoded value 'Federated'
         will be used.
 
-        :raise AssertionError if domain named match the value in the config.
+        :raise AssertionError: if domain named match the value in the config.
 
         """
         # NOTE(marek-denis): We cannot create this attribute in the __init__ as
@@ -149,7 +149,7 @@ class Manager(manager.Manager):
     def assert_project_enabled(self, project_id, project=None):
         """Assert the project is enabled and its associated domain is enabled.
 
-        :raise AssertionError if the project or domain is disabled.
+        :raise AssertionError: if the project or domain is disabled.
         """
         if project is None:
             project = self.get_project(project_id)
@@ -541,7 +541,7 @@ class Manager(manager.Manager):
 
 
 @six.add_metaclass(abc.ABCMeta)
-class Driver(object):
+class ResourceDriverV8(object):
 
     def _get_list_limit(self):
         return CONF.resource.list_limit or CONF.list_limit
@@ -551,7 +551,8 @@ class Driver(object):
         """Get a tenant by name.
 
         :returns: tenant_ref
-        :raises: keystone.exception.ProjectNotFound
+        :raises keystone.exception.ProjectNotFound: if a project with the
+                             tenant_name does not exist within the domain
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -561,7 +562,8 @@ class Driver(object):
     def create_domain(self, domain_id, domain):
         """Creates a new domain.
 
-        :raises: keystone.exception.Conflict
+        :raises keystone.exception.Conflict: if the domain_id or domain name
+                                             already exists
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -597,7 +599,7 @@ class Driver(object):
         """Get a domain by ID.
 
         :returns: domain_ref
-        :raises: keystone.exception.DomainNotFound
+        :raises keystone.exception.DomainNotFound: if domain_id does not exist
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -607,7 +609,8 @@ class Driver(object):
         """Get a domain by name.
 
         :returns: domain_ref
-        :raises: keystone.exception.DomainNotFound
+        :raises keystone.exception.DomainNotFound: if domain_name does not
+                                                   exist
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -616,8 +619,8 @@ class Driver(object):
     def update_domain(self, domain_id, domain):
         """Updates an existing domain.
 
-        :raises: keystone.exception.DomainNotFound,
-                 keystone.exception.Conflict
+        :raises keystone.exception.DomainNotFound: if domain_id does not exist
+        :raises keystone.exception.Conflict: if domain name already exists
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -626,7 +629,7 @@ class Driver(object):
     def delete_domain(self, domain_id):
         """Deletes an existing domain.
 
-        :raises: keystone.exception.DomainNotFound
+        :raises keystone.exception.DomainNotFound: if domain_id does not exist
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -636,7 +639,8 @@ class Driver(object):
     def create_project(self, project_id, project):
         """Creates a new project.
 
-        :raises: keystone.exception.Conflict
+        :raises keystone.exception.Conflict: if project_id or project name
+                                             already exists
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -698,7 +702,8 @@ class Driver(object):
         """Get a project by ID.
 
         :returns: project_ref
-        :raises: keystone.exception.ProjectNotFound
+        :raises keystone.exception.ProjectNotFound: if project_id does not
+                                                    exist
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -707,8 +712,9 @@ class Driver(object):
     def update_project(self, project_id, project):
         """Updates an existing project.
 
-        :raises: keystone.exception.ProjectNotFound,
-                 keystone.exception.Conflict
+        :raises keystone.exception.ProjectNotFound: if project_id does not
+                                                    exist
+        :raises keystone.exception.Conflict: if project name already exists
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -717,7 +723,8 @@ class Driver(object):
     def delete_project(self, project_id):
         """Deletes an existing project.
 
-        :raises: keystone.exception.ProjectNotFound
+        :raises keystone.exception.ProjectNotFound: if project_id does not
+                                                    exist
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -730,7 +737,8 @@ class Driver(object):
                            project.
 
         :returns: a list of project_refs or an empty list.
-        :raises: keystone.exception.ProjectNotFound
+        :raises keystone.exception.ProjectNotFound: if project_id does not
+                                                    exist
 
         """
         raise exception.NotImplemented()
@@ -744,7 +752,8 @@ class Driver(object):
                            this project.
 
         :returns: a list of project_refs or an empty list
-        :raises: keystone.exception.ProjectNotFound
+        :raises keystone.exception.ProjectNotFound: if project_id does not
+                                                    exist
 
         """
         raise exception.NotImplemented()
@@ -756,7 +765,8 @@ class Driver(object):
         :param project_id: the driver will check if this project
                            is a leaf in the hierarchy.
 
-        :raises: keystone.exception.ProjectNotFound
+        :raises keystone.exception.ProjectNotFound: if project_id does not
+                                                    exist
 
         """
         raise exception.NotImplemented()
@@ -794,6 +804,9 @@ class Driver(object):
         """
         if domain_id != CONF.identity.default_domain_id:
             raise exception.DomainNotFound(domain_id=domain_id)
+
+
+Driver = manager.create_legacy_driver(ResourceDriverV8)
 
 
 MEMOIZE_CONFIG = cache.get_memoization_decorator(section='domain_config')
@@ -1272,7 +1285,7 @@ class DomainConfigManager(manager.Manager):
 
 
 @six.add_metaclass(abc.ABCMeta)
-class DomainConfigDriver(object):
+class DomainConfigDriverV8(object):
     """Interface description for a Domain Config driver."""
 
     @abc.abstractmethod
@@ -1287,7 +1300,7 @@ class DomainConfigDriver(object):
         :param sensitive: whether the option is sensitive
 
         :returns: dict containing group, option and value
-        :raises: keystone.exception.Conflict
+        :raises keystone.exception.Conflict: when the option already exists
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -1302,8 +1315,8 @@ class DomainConfigDriver(object):
         :param sensitive: whether the option is sensitive
 
         :returns: dict containing group, option and value
-        :raises: keystone.exception.DomainConfigNotFound: the option doesn't
-                                                          exist.
+        :raises keystone.exception.DomainConfigNotFound: the option doesn't
+                                                         exist.
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -1336,8 +1349,8 @@ class DomainConfigDriver(object):
         :param sensitive: whether the option is sensitive
 
         :returns: dict containing updated group, option and value
-        :raises: keystone.exception.DomainConfigNotFound: the option doesn't
-                                                          exist.
+        :raises keystone.exception.DomainConfigNotFound: the option doesn't
+                                                         exist.
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -1359,3 +1372,6 @@ class DomainConfigDriver(object):
 
         """
         raise exception.NotImplemented()  # pragma: no cover
+
+
+DomainConfigDriver = manager.create_legacy_driver(DomainConfigDriverV8)

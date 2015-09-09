@@ -109,25 +109,43 @@ class FederatedSetupMixin(object):
         self.assertEqual(token_projects, projects_ref)
 
     def _check_scoped_token_attributes(self, token):
-        def xor_project_domain(token_keys):
-            return sum(('project' in token_keys, 'domain' in token_keys)) % 2
 
         for obj in ('user', 'catalog', 'expires_at', 'issued_at',
                     'methods', 'roles'):
             self.assertIn(obj, token)
-        # Check for either project or domain
-        if not xor_project_domain(list(token.keys())):
-            raise AssertionError("You must specify either"
-                                 "project or domain.")
 
-        self.assertIn('OS-FEDERATION', token['user'])
         os_federation = token['user']['OS-FEDERATION']
+
+        self.assertIn('groups', os_federation)
+        self.assertIn('identity_provider', os_federation)
+        self.assertIn('protocol', os_federation)
+        self.assertThat(os_federation, matchers.HasLength(3))
+
         self.assertEqual(self.IDP, os_federation['identity_provider']['id'])
         self.assertEqual(self.PROTOCOL, os_federation['protocol']['id'])
-        self.assertListEqual(sorted(['groups',
-                                     'identity_provider',
-                                     'protocol']),
-                             sorted(os_federation.keys()))
+
+    def _check_project_scoped_token_attributes(self, token, project_id):
+        self.assertEqual(project_id, token['project']['id'])
+        self._check_scoped_token_attributes(token)
+
+    def _check_domain_scoped_token_attributes(self, token, domain_id):
+        self.assertEqual(domain_id, token['domain']['id'])
+        self._check_scoped_token_attributes(token)
+
+    def assertValidMappedUser(self, token):
+        """Check if user object meets all the criteria."""
+
+        user = token['user']
+        self.assertIn('id', user)
+        self.assertIn('name', user)
+        self.assertIn('domain', user)
+
+        self.assertIn('groups', user['OS-FEDERATION'])
+        self.assertIn('identity_provider', user['OS-FEDERATION'])
+        self.assertIn('protocol', user['OS-FEDERATION'])
+
+        # Make sure user_id is url safe
+        self.assertEqual(urllib.parse.quote(user['name']), user['id'])
 
     def _issue_unscoped_token(self,
                               idp=None,
@@ -1494,6 +1512,7 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
     def test_issue_unscoped_token(self):
         r = self._issue_unscoped_token()
         self.assertIsNotNone(r.headers.get('X-Subject-Token'))
+        self.assertValidMappedUser(r.json['token'])
 
     def test_issue_unscoped_token_disabled_idp(self):
         """Checks if authentication works with disabled identity providers.
@@ -1632,11 +1651,12 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
             self.TOKEN_SCOPE_PROJECT_EMPLOYEE_FROM_EMPLOYEE)
         token_resp = r.result['token']
         project_id = token_resp['project']['id']
-        self.assertEqual(project_id, self.proj_employees['id'])
-        self._check_scoped_token_attributes(token_resp)
+        self._check_project_scoped_token_attributes(token_resp, project_id)
         roles_ref = [self.role_employee]
+
         projects_ref = self.proj_employees
         self._check_projects_and_roles(token_resp, roles_ref, projects_ref)
+        self.assertValidMappedUser(token_resp)
 
     def test_scope_token_with_idp_disabled(self):
         """Scope token issued by disabled IdP.
@@ -1685,9 +1705,8 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         for body, project_id_ref in zip(bodies, project_ids):
             r = self.v3_authenticate_token(body)
             token_resp = r.result['token']
-            project_id = token_resp['project']['id']
-            self.assertEqual(project_id, project_id_ref)
-            self._check_scoped_token_attributes(token_resp)
+            self._check_project_scoped_token_attributes(token_resp,
+                                                        project_id_ref)
 
     def test_scope_to_project_with_only_inherited_roles(self):
         """Try to scope token whose only roles are inherited."""
@@ -1695,12 +1714,12 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         r = self.v3_authenticate_token(
             self.TOKEN_SCOPE_PROJECT_INHERITED_FROM_CUSTOMER)
         token_resp = r.result['token']
-        project_id = token_resp['project']['id']
-        self.assertEqual(project_id, self.project_inherited['id'])
-        self._check_scoped_token_attributes(token_resp)
+        self._check_project_scoped_token_attributes(
+            token_resp, self.project_inherited['id'])
         roles_ref = [self.role_customer]
         projects_ref = self.project_inherited
         self._check_projects_and_roles(token_resp, roles_ref, projects_ref)
+        self.assertValidMappedUser(token_resp)
 
     def test_scope_token_from_nonexistent_unscoped_token(self):
         """Try to scope token from non-existent unscoped token."""
@@ -1730,9 +1749,8 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
     def test_scope_to_domain_once(self):
         r = self.v3_authenticate_token(self.TOKEN_SCOPE_DOMAIN_A_FROM_CUSTOMER)
         token_resp = r.result['token']
-        domain_id = token_resp['domain']['id']
-        self.assertEqual(self.domainA['id'], domain_id)
-        self._check_scoped_token_attributes(token_resp)
+        self._check_domain_scoped_token_attributes(token_resp,
+                                                   self.domainA['id'])
 
     def test_scope_to_domain_multiple_tokens(self):
         """Issue multiple tokens scoping to different domains.
@@ -1754,9 +1772,8 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         for body, domain_id_ref in zip(bodies, domain_ids):
             r = self.v3_authenticate_token(body)
             token_resp = r.result['token']
-            domain_id = token_resp['domain']['id']
-            self.assertEqual(domain_id_ref, domain_id)
-            self._check_scoped_token_attributes(token_resp)
+            self._check_domain_scoped_token_attributes(token_resp,
+                                                       domain_id_ref)
 
     def test_scope_to_domain_with_only_inherited_roles_fails(self):
         """Try to scope to a domain that has no direct roles."""
@@ -1863,6 +1880,8 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         """
 
         r = self._issue_unscoped_token()
+        token_resp = r.json_body['token']
+        self.assertValidMappedUser(token_resp)
         employee_unscoped_token_id = r.headers.get('X-Subject-Token')
         r = self.get('/OS-FEDERATION/projects',
                      token=employee_unscoped_token_id)
@@ -1875,9 +1894,7 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
 
         r = self.v3_authenticate_token(v3_scope_request)
         token_resp = r.result['token']
-        project_id = token_resp['project']['id']
-        self.assertEqual(project['id'], project_id)
-        self._check_scoped_token_attributes(token_resp)
+        self._check_project_scoped_token_attributes(token_resp, project['id'])
 
     def test_workflow_with_groups_deletion(self):
         """Test full workflow with groups deletion before token scoping.
@@ -2379,11 +2396,13 @@ class FernetFederatedTokenTests(FederationTests, FederatedSetupMixin):
     def test_federated_unscoped_token(self):
         resp = self._issue_unscoped_token()
         self.assertEqual(204, len(resp.headers['X-Subject-Token']))
+        self.assertValidMappedUser(resp.json_body['token'])
 
     def test_federated_unscoped_token_with_multiple_groups(self):
         assertion = 'ANOTHER_CUSTOMER_ASSERTION'
         resp = self._issue_unscoped_token(assertion=assertion)
-        self.assertEqual(232, len(resp.headers['X-Subject-Token']))
+        self.assertEqual(226, len(resp.headers['X-Subject-Token']))
+        self.assertValidMappedUser(resp.json_body['token'])
 
     def test_validate_federated_unscoped_token(self):
         resp = self._issue_unscoped_token()
@@ -2400,6 +2419,7 @@ class FernetFederatedTokenTests(FederationTests, FederatedSetupMixin):
 
         """
         resp = self._issue_unscoped_token()
+        self.assertValidMappedUser(resp.json_body['token'])
         unscoped_token = resp.headers.get('X-Subject-Token')
         resp = self.get('/OS-FEDERATION/projects',
                         token=unscoped_token)
@@ -2412,9 +2432,7 @@ class FernetFederatedTokenTests(FederationTests, FederatedSetupMixin):
 
         resp = self.v3_authenticate_token(v3_scope_request)
         token_resp = resp.result['token']
-        project_id = token_resp['project']['id']
-        self.assertEqual(project['id'], project_id)
-        self._check_scoped_token_attributes(token_resp)
+        self._check_project_scoped_token_attributes(token_resp, project['id'])
 
 
 class FederatedTokenTestsMethodToken(FederatedTokenTests):
@@ -3336,6 +3354,16 @@ class WebSSOTests(FederatedTokenTests):
         self.assertRaises(exception.Unauthorized,
                           self.api.federated_sso_auth,
                           context, self.PROTOCOL)
+
+    def test_identity_provider_specific_federated_authentication(self):
+        environment = {self.REMOTE_ID_ATTR: self.REMOTE_IDS[0]}
+        context = {'environment': environment}
+        query_string = {'origin': self.ORIGIN}
+        self._inject_assertion(context, 'EMPLOYEE_ASSERTION', query_string)
+        resp = self.api.federated_idp_specific_sso_auth(context,
+                                                        self.idp['id'],
+                                                        self.PROTOCOL)
+        self.assertIn(self.TRUSTED_DASHBOARD, resp.body)
 
 
 class K2KServiceCatalogTests(FederationTests):

@@ -194,7 +194,8 @@ class DomainConfigs(dict):
         domain_config = {}
         domain_config['cfg'] = cfg.ConfigOpts()
         config.configure(conf=domain_config['cfg'])
-        domain_config['cfg'](args=[], project='keystone')
+        domain_config['cfg'](args=[], project='keystone',
+                             default_config_files=[])
 
         # Override any options that have been passed in as specified in the
         # database.
@@ -1066,7 +1067,7 @@ class Manager(manager.Manager):
 
 
 @six.add_metaclass(abc.ABCMeta)
-class Driver(object):
+class IdentityDriverV8(object):
     """Interface description for an Identity driver."""
 
     def _get_list_limit(self):
@@ -1280,6 +1281,9 @@ class Driver(object):
     # end of identity
 
 
+Driver = manager.create_legacy_driver(IdentityDriverV8)
+
+
 @dependency.provider('id_mapping_api')
 class MappingManager(manager.Manager):
     """Default pivot point for the ID Mapping backend."""
@@ -1291,7 +1295,7 @@ class MappingManager(manager.Manager):
 
 
 @six.add_metaclass(abc.ABCMeta)
-class MappingDriver(object):
+class MappingDriverV8(object):
     """Interface description for an ID Mapping driver."""
 
     @abc.abstractmethod
@@ -1350,3 +1354,6 @@ class MappingDriver(object):
 
         """
         raise exception.NotImplemented()  # pragma: no cover
+
+
+MappingDriver = manager.create_legacy_driver(MappingDriverV8)
