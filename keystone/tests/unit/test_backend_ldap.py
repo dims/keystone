@@ -21,6 +21,7 @@ import ldap
 import mock
 from oslo_config import cfg
 import pkg_resources
+from six.moves import http_client
 from six.moves import range
 from testtools import matchers
 
@@ -215,7 +216,7 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
     def test_user_filter(self):
         user_ref = self.identity_api.get_user(self.user_foo['id'])
         self.user_foo.pop('password')
-        self.assertDictEqual(user_ref, self.user_foo)
+        self.assertDictEqual(self.user_foo, user_ref)
 
         driver = self.identity_api._select_identity_driver(
             user_ref['domain_id'])
@@ -234,7 +235,7 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
         roles_ref = self.assignment_api.list_grants(
             user_id=self.user_foo['id'],
             project_id=self.tenant_baz['id'])
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(user_id=self.user_foo['id'],
                                          project_id=self.tenant_baz['id'],
@@ -273,7 +274,7 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
             group_id=new_group['id'],
             project_id=self.tenant_bar['id'])
         self.assertNotEmpty(roles_ref)
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(group_id=new_group['id'],
                                          project_id=self.tenant_bar['id'],
@@ -701,11 +702,11 @@ class BaseLDAPIdentity(test_backend.IdentityTests):
             'description': uuid.uuid4().hex}
         group = self.identity_api.create_group(group)
         group_ref = self.identity_api.get_group(group['id'])
-        self.assertDictEqual(group_ref, group)
+        self.assertDictEqual(group, group_ref)
         group['description'] = uuid.uuid4().hex
         self.identity_api.update_group(group['id'], group)
         group_ref = self.identity_api.get_group(group['id'])
-        self.assertDictEqual(group_ref, group)
+        self.assertDictEqual(group, group_ref)
 
         self.identity_api.delete_group(group['id'])
         self.assertRaises(exception.GroupNotFound,
@@ -1085,7 +1086,7 @@ class LDAPIdentity(BaseLDAPIdentity, unit.TestCase):
 
     def test_project_filter(self):
         tenant_ref = self.resource_api.get_project(self.tenant_bar['id'])
-        self.assertDictEqual(tenant_ref, self.tenant_bar)
+        self.assertDictEqual(self.tenant_bar, tenant_ref)
 
         self.config_fixture.config(group='ldap',
                                    project_filter='(CN=DOES_NOT_MATCH)')
@@ -1634,12 +1635,12 @@ class LDAPIdentity(BaseLDAPIdentity, unit.TestCase):
         self.resource_api.create_project(project['id'], project)
         project_ref = self.resource_api.get_project(project['id'])
 
-        self.assertDictEqual(project_ref, project)
+        self.assertDictEqual(project, project_ref)
 
         project['description'] = uuid.uuid4().hex
         self.resource_api.update_project(project['id'], project)
         project_ref = self.resource_api.get_project(project['id'])
-        self.assertDictEqual(project_ref, project)
+        self.assertDictEqual(project, project_ref)
 
         self.resource_api.delete_project(project['id'])
         self.assertRaises(exception.ProjectNotFound,
@@ -2132,12 +2133,12 @@ class LDAPIdentityEnabledEmulation(LDAPIdentity):
         # key with a value of True when LDAPIdentityEnabledEmulation
         # is used so we now add this expected key to the project dictionary
         project['enabled'] = True
-        self.assertDictEqual(project_ref, project)
+        self.assertDictEqual(project, project_ref)
 
         project['description'] = uuid.uuid4().hex
         self.resource_api.update_project(project['id'], project)
         project_ref = self.resource_api.get_project(project['id'])
-        self.assertDictEqual(project_ref, project)
+        self.assertDictEqual(project, project_ref)
 
         self.resource_api.delete_project(project['id'])
         self.assertRaises(exception.ProjectNotFound,
@@ -2350,7 +2351,7 @@ class LdapIdentitySqlAssignment(BaseLDAPIdentity, unit.SQLDriverOverrides,
         roles_ref = self.assignment_api.list_grants(
             group_id=new_group['id'],
             domain_id=new_domain['id'])
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(group_id=new_group['id'],
                                          domain_id=new_domain['id'],
@@ -2486,13 +2487,13 @@ class BaseMultiLDAPandSQLIdentity(object):
             self.identity_api._get_domain_driver_and_entity_id(
                 user['id']))
 
-        if expected_status == 200:
+        if expected_status == http_client.OK:
             ref = driver.get_user(entity_id)
             ref = self.identity_api._set_domain_id_and_mapping(
                 ref, domain_id, driver, map.EntityType.USER)
             user = user.copy()
             del user['password']
-            self.assertDictEqual(ref, user)
+            self.assertDictEqual(user, ref)
         else:
             # TODO(henry-nash): Use AssertRaises here, although
             # there appears to be an issue with using driver.get_user
@@ -2660,21 +2661,23 @@ class MultiLDAPandSQLIdentity(BaseLDAPIdentity, unit.SQLDriverOverrides,
 
         check_user = self.check_user
         check_user(self.users['user0'],
-                   self.domains['domain_default']['id'], 200)
+                   self.domains['domain_default']['id'], http_client.OK)
         for domain in [self.domains['domain1']['id'],
                        self.domains['domain2']['id'],
                        self.domains['domain3']['id'],
                        self.domains['domain4']['id']]:
             check_user(self.users['user0'], domain, exception.UserNotFound)
 
-        check_user(self.users['user1'], self.domains['domain1']['id'], 200)
+        check_user(self.users['user1'], self.domains['domain1']['id'],
+                   http_client.OK)
         for domain in [self.domains['domain_default']['id'],
                        self.domains['domain2']['id'],
                        self.domains['domain3']['id'],
                        self.domains['domain4']['id']]:
             check_user(self.users['user1'], domain, exception.UserNotFound)
 
-        check_user(self.users['user2'], self.domains['domain2']['id'], 200)
+        check_user(self.users['user2'], self.domains['domain2']['id'],
+                   http_client.OK)
         for domain in [self.domains['domain_default']['id'],
                        self.domains['domain1']['id'],
                        self.domains['domain3']['id'],
@@ -2684,10 +2687,14 @@ class MultiLDAPandSQLIdentity(BaseLDAPIdentity, unit.SQLDriverOverrides,
         # domain3 and domain4 share the same backend, so you should be
         # able to see user3 and user4 from either.
 
-        check_user(self.users['user3'], self.domains['domain3']['id'], 200)
-        check_user(self.users['user3'], self.domains['domain4']['id'], 200)
-        check_user(self.users['user4'], self.domains['domain3']['id'], 200)
-        check_user(self.users['user4'], self.domains['domain4']['id'], 200)
+        check_user(self.users['user3'], self.domains['domain3']['id'],
+                   http_client.OK)
+        check_user(self.users['user3'], self.domains['domain4']['id'],
+                   http_client.OK)
+        check_user(self.users['user4'], self.domains['domain3']['id'],
+                   http_client.OK)
+        check_user(self.users['user4'], self.domains['domain4']['id'],
+                   http_client.OK)
 
         for domain in [self.domains['domain_default']['id'],
                        self.domains['domain1']['id'],
@@ -2781,7 +2788,7 @@ class MultiLDAPandSQLIdentity(BaseLDAPIdentity, unit.SQLDriverOverrides,
         self.resource_api.create_domain(domain['id'], domain)
         self.resource_api.create_project(project['id'], project)
         project_ref = self.resource_api.get_project(project['id'])
-        self.assertDictEqual(project_ref, project)
+        self.assertDictEqual(project, project_ref)
 
         self.assignment_api.create_grant(user_id=self.user_foo['id'],
                                          project_id=project['id'],
@@ -2943,15 +2950,100 @@ class MultiLDAPandSQLIdentityDomainConfigsInSQL(MultiLDAPandSQLIdentity):
             domain_cfgs.get_domain_conf(CONF.identity.default_domain_id))
         self.assertEqual(CONF.ldap.url, default_config.ldap.url)
 
-    def test_setting_sql_driver_raises_exception(self):
-        """Ensure setting of domain specific sql driver is prevented."""
+    def test_setting_multiple_sql_driver_raises_exception(self):
+        """Ensure setting multiple domain specific sql drivers is prevented."""
 
         new_config = {'identity': {'driver': 'sql'}}
         self.domain_config_api.create_config(
             CONF.identity.default_domain_id, new_config)
-        self.assertRaises(exception.InvalidDomainConfig,
+        self.identity_api.domain_configs.get_domain_conf(
+            CONF.identity.default_domain_id)
+        self.domain_config_api.create_config(self.domains['domain1']['id'],
+                                             new_config)
+        self.assertRaises(exception.MultipleSQLDriversInConfig,
                           self.identity_api.domain_configs.get_domain_conf,
-                          CONF.identity.default_domain_id)
+                          self.domains['domain1']['id'])
+
+    def test_same_domain_gets_sql_driver(self):
+        """Ensure we can set an SQL driver if we have had it before."""
+
+        new_config = {'identity': {'driver': 'sql'}}
+        self.domain_config_api.create_config(
+            CONF.identity.default_domain_id, new_config)
+        self.identity_api.domain_configs.get_domain_conf(
+            CONF.identity.default_domain_id)
+
+        # By using a slightly different config, we cause the driver to be
+        # reloaded...and hence check if we can reuse the sql driver
+        new_config = {'identity': {'driver': 'sql'},
+                      'ldap': {'url': 'fake://memory1'}}
+        self.domain_config_api.create_config(
+            CONF.identity.default_domain_id, new_config)
+        self.identity_api.domain_configs.get_domain_conf(
+            CONF.identity.default_domain_id)
+
+    def test_delete_domain_clears_sql_registration(self):
+        """Ensure registration is deleted when a domain is deleted."""
+
+        domain = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain = self.resource_api.create_domain(domain['id'], domain)
+        new_config = {'identity': {'driver': 'sql'}}
+        self.domain_config_api.create_config(domain['id'], new_config)
+        self.identity_api.domain_configs.get_domain_conf(domain['id'])
+
+        # First show that trying to set SQL for another driver fails
+        self.domain_config_api.create_config(self.domains['domain1']['id'],
+                                             new_config)
+        self.assertRaises(exception.MultipleSQLDriversInConfig,
+                          self.identity_api.domain_configs.get_domain_conf,
+                          self.domains['domain1']['id'])
+        self.domain_config_api.delete_config(self.domains['domain1']['id'])
+
+        # Now we delete the domain
+        domain['enabled'] = False
+        self.resource_api.update_domain(domain['id'], domain)
+        self.resource_api.delete_domain(domain['id'])
+
+        # The registration should now be available
+        self.domain_config_api.create_config(self.domains['domain1']['id'],
+                                             new_config)
+        self.identity_api.domain_configs.get_domain_conf(
+            self.domains['domain1']['id'])
+
+    def test_orphaned_registration_does_not_prevent_getting_sql_driver(self):
+        """Ensure we self heal an orphaned sql registration."""
+
+        domain = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain = self.resource_api.create_domain(domain['id'], domain)
+        new_config = {'identity': {'driver': 'sql'}}
+        self.domain_config_api.create_config(domain['id'], new_config)
+        self.identity_api.domain_configs.get_domain_conf(domain['id'])
+
+        # First show that trying to set SQL for another driver fails
+        self.domain_config_api.create_config(self.domains['domain1']['id'],
+                                             new_config)
+        self.assertRaises(exception.MultipleSQLDriversInConfig,
+                          self.identity_api.domain_configs.get_domain_conf,
+                          self.domains['domain1']['id'])
+
+        # Now we delete the domain by using the backend driver directly,
+        # which causes the domain to be deleted without any of the cleanup
+        # that is in the manager (this is simulating a server process crashing
+        # in the middle of a delete domain operation, and somehow leaving the
+        # domain config settings in place, but the domain is deleted). We
+        # should still be able to set another domain to SQL, since we should
+        # self heal this issue.
+
+        self.resource_api.driver.delete_domain(domain['id'])
+        # Invalidate cache (so we will see the domain has gone)
+        self.resource_api.get_domain.invalidate(
+            self.resource_api, domain['id'])
+
+        # The registration should now be available
+        self.domain_config_api.create_config(self.domains['domain1']['id'],
+                                             new_config)
+        self.identity_api.domain_configs.get_domain_conf(
+            self.domains['domain1']['id'])
 
 
 class DomainSpecificLDAPandSQLIdentity(
@@ -3059,12 +3151,12 @@ class DomainSpecificLDAPandSQLIdentity(
         # driver, but won't find it via any other domain driver
 
         self.check_user(self.users['user0'],
-                        self.domains['domain_default']['id'], 200)
+                        self.domains['domain_default']['id'], http_client.OK)
         self.check_user(self.users['user0'],
                         self.domains['domain1']['id'], exception.UserNotFound)
 
         self.check_user(self.users['user1'],
-                        self.domains['domain1']['id'], 200)
+                        self.domains['domain1']['id'], http_client.OK)
         self.check_user(self.users['user1'],
                         self.domains['domain_default']['id'],
                         exception.UserNotFound)

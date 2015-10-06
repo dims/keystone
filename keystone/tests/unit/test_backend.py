@@ -87,6 +87,20 @@ class AssignmentTestHelperMixin(object):
         # 'entities': {'domains': [{'id': DEFAULT_DOMAIN, 'users': 3},
         #                          {'projects': 3}, 5]},
         #
+        # A project hierarchy can be specified within the 'projects' section by
+        # nesting the 'project' key, for example to create a project with three
+        # sub-projects you would use:
+
+                     'projects': {'project': 3}
+
+        # A more complex hierarchy can also be defined, for example the
+        # following would define three projects each containing a
+        # sub-project, each of which contain a further three sub-projects.
+
+                     'projects': [{'project': {'project': 3}},
+                                  {'project': {'project': 3}},
+                                  {'project': {'project': 3}}]
+
         # A list of groups and their members. In this case make users with
         # index 0 and 1 members of group with index 0. Users and Groups are
         # indexed in the order they appear in the 'entities' key above.
@@ -122,31 +136,54 @@ class AssignmentTestHelperMixin(object):
         # 'inherited_to_projects' options to list_role_assignments.}
 
     """
-    def create_entities(self, entity_pattern):
-        """Create the entities specified in the test plan.
+    def _handle_project_spec(self, test_data, domain_id, project_spec,
+                             parent_id=None):
+        """Handle the creation of a project or hierarchy of projects.
 
-        Process the 'entities' key in the test plan, creating the requested
-        entities. Each created entity will be added to the array of entities
-        stored in the returned test_data object, e.g.:
+        project_spec may either be a count of the number of projects to
+        create, or it may be a list of the form:
 
-        test_data['users'] = [user[0], user[1]....]
+        [{'project': project_spec}, {'project': project_spec}, ...]
+
+        This method is called recursively to handle the creation of a
+        hierarchy of projects.
 
         """
-        def _create_entity_in_domain(entity_type, domain_id):
-            new_entity = {'name': uuid.uuid4().hex, 'domain_id': domain_id}
-            if entity_type == 'users':
-                new_entity = self.identity_api.create_user(new_entity)
-            elif entity_type == 'groups':
-                new_entity = self.identity_api.create_group(new_entity)
-            elif entity_type == 'projects':
-                new_entity['id'] = uuid.uuid4().hex
-                new_entity = self.resource_api.create_project(new_entity['id'],
-                                                              new_entity)
-            else:
-                # Must be a bad test plan
-                raise exception.NotImplemented()
-            return new_entity
+        def _create_project(domain_id, parent_id):
+            new_project = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex,
+                           'domain_id': domain_id, 'parent_id': parent_id}
+            new_project = self.resource_api.create_project(new_project['id'],
+                                                           new_project)
+            return new_project
 
+        if isinstance(project_spec, list):
+            for this_spec in project_spec:
+                self._handle_project_spec(
+                    test_data, domain_id, this_spec, parent_id=parent_id)
+        elif isinstance(project_spec, dict):
+            new_proj = _create_project(domain_id, parent_id)
+            test_data['projects'].append(new_proj)
+            self._handle_project_spec(
+                test_data, domain_id, project_spec['project'],
+                parent_id=new_proj['id'])
+        else:
+            for _ in range(project_spec):
+                test_data['projects'].append(
+                    _create_project(domain_id, parent_id))
+
+    def _handle_domain_spec(self, test_data, domain_spec):
+        """Handle the creation of domains and their contents.
+
+        domain_spec may either be a count of the number of empty domains to
+        create, a dict describing the domain contents, or a list of
+        domain_specs.
+
+        In the case when a list is provided, this method calls itself
+        recursively to handle the list elements.
+
+        This method will insert any entities created into test_data
+
+        """
         def _create_domain(domain_id=None):
             if domain_id is None:
                 new_domain = {'id': uuid.uuid4().hex,
@@ -158,40 +195,59 @@ class AssignmentTestHelperMixin(object):
                 # The test plan specified an existing domain to use
                 return self.resource_api.get_domain(domain_id)
 
-        def _create_role():
-            new_role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
-            return self.role_api.create_role(new_role['id'], new_role)
+        def _create_entity_in_domain(entity_type, domain_id):
+            """Create a user or group entity in the domain."""
 
-        def _handle_domain_spec(domain_spec):
-            """Handle the creation of domains and their contents.
+            new_entity = {'name': uuid.uuid4().hex, 'domain_id': domain_id}
+            if entity_type == 'users':
+                new_entity = self.identity_api.create_user(new_entity)
+            elif entity_type == 'groups':
+                new_entity = self.identity_api.create_group(new_entity)
+            else:
+                # Must be a bad test plan
+                raise exception.NotImplemented()
+            return new_entity
 
-            domain_spec may either be a count of the number of empty domains to
-            create, a dict describing the domain contents, or a list of
-            domain_specs.
-
-            In the case when a list is provided, this method calls itself
-            recursively to handle the list elements.
-
-            """
-            if isinstance(domain_spec, list):
-                for x in domain_spec:
-                    _handle_domain_spec(x)
-            elif isinstance(domain_spec, dict):
-                # If there is a domain ID specified, then use it
-                the_domain = _create_domain(domain_id=domain_spec.get('id'))
-                test_data['domains'].append(the_domain)
-                for entity_type, count in domain_spec.items():
-                    if entity_type == 'id':
-                        # We already used this above to determine whether to
-                        # use and existing domain
-                        continue
-                    for _ in range(count):
+        if isinstance(domain_spec, list):
+            for x in domain_spec:
+                self._handle_domain_spec(test_data, x)
+        elif isinstance(domain_spec, dict):
+            # If there is a domain ID specified, then use it
+            the_domain = _create_domain(domain_spec.get('id'))
+            test_data['domains'].append(the_domain)
+            for entity_type, value in domain_spec.items():
+                if entity_type == 'id':
+                    # We already used this above to determine whether to
+                    # use and existing domain
+                    continue
+                if entity_type == 'projects':
+                    # If it's projects, we need to handle the potential
+                    # specification of a project hierarchy
+                    self._handle_project_spec(
+                        test_data, the_domain['id'], value)
+                else:
+                    # It's a count of number of entities
+                    for _ in range(value):
                         test_data[entity_type].append(
                             _create_entity_in_domain(
                                 entity_type, the_domain['id']))
-            else:
-                for _ in range(domain_spec):
-                    test_data['domains'].append(_create_domain())
+        else:
+            for _ in range(domain_spec):
+                test_data['domains'].append(_create_domain())
+
+    def create_entities(self, entity_pattern):
+        """Create the entities specified in the test plan.
+
+        Process the 'entities' key in the test plan, creating the requested
+        entities. Each created entity will be added to the array of entities
+        stored in the returned test_data object, e.g.:
+
+        test_data['users'] = [user[0], user[1]....]
+
+        """
+        def _create_role():
+            new_role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+            return self.role_api.create_role(new_role['id'], new_role)
 
         test_data = {}
         for entity in ['users', 'groups', 'domains', 'projects', 'roles']:
@@ -200,7 +256,7 @@ class AssignmentTestHelperMixin(object):
         # Create any domains requested and, if specified, any entities within
         # those domains
         if 'domains' in entity_pattern:
-            _handle_domain_spec(entity_pattern['domains'])
+            self._handle_domain_spec(test_data, entity_pattern['domains'])
 
         # Create any roles requested
         if 'roles' in entity_pattern:
@@ -423,7 +479,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         #               not be returned by the api
         self.user_sna.pop('password')
         self.user_sna['enabled'] = True
-        self.assertDictEqual(user_ref, self.user_sna)
+        self.assertDictEqual(self.user_sna, user_ref)
 
     def test_authenticate_and_get_roles_no_metadata(self):
         user = {
@@ -473,7 +529,7 @@ class IdentityTests(AssignmentTestHelperMixin):
 
     def test_get_project(self):
         tenant_ref = self.resource_api.get_project(self.tenant_bar['id'])
-        self.assertDictEqual(tenant_ref, self.tenant_bar)
+        self.assertDictEqual(self.tenant_bar, tenant_ref)
 
     def test_get_project_404(self):
         self.assertRaises(exception.ProjectNotFound,
@@ -484,7 +540,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         tenant_ref = self.resource_api.get_project_by_name(
             self.tenant_bar['name'],
             DEFAULT_DOMAIN_ID)
-        self.assertDictEqual(tenant_ref, self.tenant_bar)
+        self.assertDictEqual(self.tenant_bar, tenant_ref)
 
     def test_get_project_by_name_404(self):
         self.assertRaises(exception.ProjectNotFound,
@@ -541,7 +597,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         #               it easier to authenticate in tests, but should
         #               not be returned by the api
         self.user_foo.pop('password')
-        self.assertDictEqual(user_ref, self.user_foo)
+        self.assertDictEqual(self.user_foo, user_ref)
 
     @unit.skip_if_cache_disabled('identity')
     def test_cache_layer_get_user(self):
@@ -593,7 +649,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         #               it easier to authenticate in tests, but should
         #               not be returned by the api
         self.user_foo.pop('password')
-        self.assertDictEqual(user_ref, self.user_foo)
+        self.assertDictEqual(self.user_foo, user_ref)
 
     @unit.skip_if_cache_disabled('identity')
     def test_cache_layer_get_user_by_name(self):
@@ -670,6 +726,9 @@ class IdentityTests(AssignmentTestHelperMixin):
         user = self.identity_api.create_user(user)
         user['domain_id'] = domain2['id']
         self.identity_api.update_user(user['id'], user)
+
+        updated_user_ref = self.identity_api.get_user(user['id'])
+        self.assertEqual(domain2['id'], updated_user_ref['domain_id'])
 
     def test_move_user_between_domains_with_clashing_names_fails(self):
         domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
@@ -771,6 +830,9 @@ class IdentityTests(AssignmentTestHelperMixin):
         self.resource_api.create_project(project['id'], project)
         project['domain_id'] = domain2['id']
         self.resource_api.update_project(project['id'], project)
+
+        updated_project_ref = self.resource_api.get_project(project['id'])
+        self.assertEqual(domain2['id'], updated_project_ref['domain_id'])
 
     def test_move_project_between_domains_with_clashing_names_fails(self):
         domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
@@ -958,8 +1020,8 @@ class IdentityTests(AssignmentTestHelperMixin):
             user_id=user_ref['id'],
             tenant_id=project_ref['id'])
 
-        self.assertEqual(set(role_list),
-                         set([r['id'] for r in role_ref_list]))
+        self.assertEqual(set([r['id'] for r in role_ref_list]),
+                         set(role_list))
 
     def test_get_role_by_user_and_project(self):
         roles_ref = self.assignment_api.get_roles_for_user_and_project(
@@ -1138,7 +1200,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         roles_ref = self.assignment_api.list_grants(
             user_id=self.user_foo['id'],
             project_id=self.tenant_baz['id'])
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(user_id=self.user_foo['id'],
                                          project_id=self.tenant_baz['id'],
@@ -1225,7 +1287,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         roles_ref = self.assignment_api.list_grants(
             group_id=new_group['id'],
             project_id=self.tenant_bar['id'])
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(group_id=new_group['id'],
                                          project_id=self.tenant_bar['id'],
@@ -1263,7 +1325,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         roles_ref = self.assignment_api.list_grants(
             group_id=new_group['id'],
             domain_id=new_domain['id'])
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(group_id=new_group['id'],
                                          domain_id=new_domain['id'],
@@ -1320,7 +1382,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         roles_ref = self.assignment_api.list_grants(
             group_id=new_group['id'],
             domain_id=new_domain['id'])
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(group_id=new_group['id'],
                                          domain_id=new_domain['id'],
@@ -1351,7 +1413,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         roles_ref = self.assignment_api.list_grants(
             user_id=new_user['id'],
             domain_id=new_domain['id'])
-        self.assertDictEqual(roles_ref[0], self.role_member)
+        self.assertDictEqual(self.role_member, roles_ref[0])
 
         self.assignment_api.delete_grant(user_id=new_user['id'],
                                          domain_id=new_domain['id'],
@@ -1398,11 +1460,11 @@ class IdentityTests(AssignmentTestHelperMixin):
         roles_ref = self.assignment_api.list_grants(
             group_id=group1['id'],
             domain_id=domain1['id'])
-        self.assertDictEqual(roles_ref[0], group1_domain1_role)
+        self.assertDictEqual(group1_domain1_role, roles_ref[0])
         roles_ref = self.assignment_api.list_grants(
             group_id=group1['id'],
             domain_id=domain2['id'])
-        self.assertDictEqual(roles_ref[0], group1_domain2_role)
+        self.assertDictEqual(group1_domain2_role, roles_ref[0])
 
         self.assignment_api.delete_grant(group_id=group1['id'],
                                          domain_id=domain2['id'],
@@ -1448,11 +1510,11 @@ class IdentityTests(AssignmentTestHelperMixin):
         roles_ref = self.assignment_api.list_grants(
             user_id=user1['id'],
             domain_id=domain1['id'])
-        self.assertDictEqual(roles_ref[0], user1_domain1_role)
+        self.assertDictEqual(user1_domain1_role, roles_ref[0])
         roles_ref = self.assignment_api.list_grants(
             user_id=user1['id'],
             domain_id=domain2['id'])
-        self.assertDictEqual(roles_ref[0], user1_domain2_role)
+        self.assertDictEqual(user1_domain2_role, roles_ref[0])
 
         self.assignment_api.delete_grant(user_id=user1['id'],
                                          domain_id=domain2['id'],
@@ -1509,7 +1571,7 @@ class IdentityTests(AssignmentTestHelperMixin):
             group_id=group1['id'],
             project_id=project1['id'])
         self.assertEqual(1, len(roles_ref))
-        self.assertDictEqual(roles_ref[0], role2)
+        self.assertDictEqual(role2, roles_ref[0])
 
     def test_role_grant_by_user_and_cross_domain_project(self):
         role1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
@@ -1553,7 +1615,7 @@ class IdentityTests(AssignmentTestHelperMixin):
             user_id=user1['id'],
             project_id=project1['id'])
         self.assertEqual(1, len(roles_ref))
-        self.assertDictEqual(roles_ref[0], role2)
+        self.assertDictEqual(role2, roles_ref[0])
 
     def test_delete_user_grant_no_user(self):
         # Can delete a grant where the user doesn't exist.
@@ -2690,7 +2752,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         ref = self.resource_api.create_project(sub_project['id'], sub_project)
 
         # The parent_id should be set to the domain_id
-        self.assertEqual(ref['parent_id'], project['id'])
+        self.assertEqual(project['id'], ref['parent_id'])
 
     def test_check_leaf_projects(self):
         projects_hierarchy = self._create_projects_hierarchy()
@@ -3216,7 +3278,7 @@ class IdentityTests(AssignmentTestHelperMixin):
 
         group_ref = self.identity_api.get_group_by_name(
             group_name, DEFAULT_DOMAIN_ID)
-        self.assertDictEqual(group_ref, group)
+        self.assertDictEqual(group, group_ref)
 
     def test_get_group_by_name_404(self):
         self.assertRaises(exception.GroupNotFound,
@@ -3276,6 +3338,9 @@ class IdentityTests(AssignmentTestHelperMixin):
         group = self.identity_api.create_group(group)
         group['domain_id'] = domain2['id']
         self.identity_api.update_group(group['id'], group)
+
+        updated_group_ref = self.identity_api.get_group(group['id'])
+        self.assertEqual(domain2['id'], updated_group_ref['domain_id'])
 
     def test_move_group_between_domains_with_clashing_names_fails(self):
         domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
@@ -3367,7 +3432,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         leaf_project['description'] = 'new description'
         self.resource_api.update_project(leaf_project['id'], leaf_project)
         proj_ref = self.resource_api.get_project(leaf_project['id'])
-        self.assertDictEqual(proj_ref, leaf_project)
+        self.assertDictEqual(leaf_project, proj_ref)
 
         # update the parent_id is not allowed
         leaf_project['parent_id'] = root_project1['id']
@@ -3496,7 +3561,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         self.resource_api.update_project(leaf_project['id'], leaf_project)
 
         project_ref = self.resource_api.get_project(leaf_project['id'])
-        self.assertEqual(project_ref['enabled'], leaf_project['enabled'])
+        self.assertEqual(leaf_project['enabled'], project_ref['enabled'])
 
     def test_disable_hierarchical_not_leaf_project(self):
         projects_hierarchy = self._create_projects_hierarchy()
@@ -3567,7 +3632,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         self.resource_api.update_project(project['id'], project)
 
         project_ref = self.resource_api.get_project(project['id'])
-        self.assertDictEqual(project_ref, project)
+        self.assertDictEqual(project, project_ref)
 
     def test_project_update_missing_attrs_with_a_falsey_value(self):
         # Creating a project with no description attribute.
@@ -3584,19 +3649,19 @@ class IdentityTests(AssignmentTestHelperMixin):
         self.resource_api.update_project(project['id'], project)
 
         project_ref = self.resource_api.get_project(project['id'])
-        self.assertDictEqual(project_ref, project)
+        self.assertDictEqual(project, project_ref)
 
     def test_domain_crud(self):
         domain = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex,
                   'enabled': True}
         self.resource_api.create_domain(domain['id'], domain)
         domain_ref = self.resource_api.get_domain(domain['id'])
-        self.assertDictEqual(domain_ref, domain)
+        self.assertDictEqual(domain, domain_ref)
 
         domain['name'] = uuid.uuid4().hex
         self.resource_api.update_domain(domain['id'], domain)
         domain_ref = self.resource_api.get_domain(domain['id'])
-        self.assertDictEqual(domain_ref, domain)
+        self.assertDictEqual(domain, domain_ref)
 
         # Ensure an 'enabled' domain cannot be deleted
         self.assertRaises(exception.ForbiddenAction,
@@ -3989,7 +4054,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         self.assertIs(False, updated_project_ref['enabled'])
 
         project_ref = self.resource_api.get_project(project['id'])
-        self.assertDictEqual(project_ref, updated_project_ref)
+        self.assertDictEqual(updated_project_ref, project_ref)
 
     def test_user_update_and_user_get_return_same_response(self):
         user = {
@@ -4010,7 +4075,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         self.assertIs(False, updated_user_ref['enabled'])
 
         user_ref = self.identity_api.get_user(user['id'])
-        self.assertDictEqual(user_ref, updated_user_ref)
+        self.assertDictEqual(updated_user_ref, user_ref)
 
     def test_delete_group_removes_role_assignments(self):
         # When a group is deleted any role assignments for the group are
@@ -4378,7 +4443,7 @@ class TokenTests(object):
         self.assertIsInstance(expires, datetime.datetime)
         data_ref.pop('id')
         data.pop('id')
-        self.assertDictEqual(data_ref, data)
+        self.assertDictEqual(data, data_ref)
 
         new_data_ref = self.token_provider_api._persistence.get_token(token_id)
         expires = new_data_ref.pop('expires')
@@ -4559,7 +4624,7 @@ class TokenTests(object):
         data_ref = self.token_provider_api._persistence.create_token(token_id,
                                                                      data)
         data_ref.pop('user_id')
-        self.assertDictEqual(data_ref, data)
+        self.assertDictEqual(data, data_ref)
         self.assertRaises(exception.TokenNotFound,
                           self.token_provider_api._persistence.get_token,
                           token_id)
@@ -4615,7 +4680,7 @@ class TokenTests(object):
 
     def test_list_revoked_tokens_for_multiple_tokens(self):
         self.check_list_revoked_tokens([self.delete_token()
-                                        for x in six.moves.range(2)])
+                                        for x in range(2)])
 
     def test_flush_expired_token(self):
         token_id = uuid.uuid4().hex
@@ -4627,7 +4692,7 @@ class TokenTests(object):
         data_ref = self.token_provider_api._persistence.create_token(token_id,
                                                                      data)
         data_ref.pop('user_id')
-        self.assertDictEqual(data_ref, data)
+        self.assertDictEqual(data, data_ref)
 
         token_id = uuid.uuid4().hex
         expire_time = timeutils.utcnow() + datetime.timedelta(minutes=1)
@@ -4638,7 +4703,7 @@ class TokenTests(object):
         data_ref = self.token_provider_api._persistence.create_token(token_id,
                                                                      data)
         data_ref.pop('user_id')
-        self.assertDictEqual(data_ref, data)
+        self.assertDictEqual(data, data_ref)
 
         self.token_provider_api._persistence.flush_expired_tokens()
         tokens = self.token_provider_api._persistence._list_tokens(
@@ -5010,7 +5075,7 @@ class CatalogTests(object):
         # the endpoint, with None value.
         expected_region = new_region.copy()
         expected_region['parent_region_id'] = None
-        self.assertDictEqual(res, expected_region)
+        self.assertDictEqual(expected_region, res)
 
         # Test adding another region with the one above
         # as its parent. We will check below whether deleting
@@ -6272,6 +6337,50 @@ class InheritanceTests(AssignmentTestHelperMixin):
         self.assertEqual(1, len(user_projects))
         self.assertIn(root_project, user_projects)
 
+        # TODO(henry-nash): The test above uses list_projects_for_user
+        # which may, in a subsequent patch, be re-implemeted to call
+        # list_role_assignments and then report only the distinct projects.
+        #
+        # The test plan below therefore mirrors this test, to ensure that
+        # list_role_assignments works the same. Once list_projects_for_user
+        # has been re-implemented then the manual tests above can be
+        # refactored.
+        test_plan = {
+            # A domain with a project and sub-project, plus a user.
+            # Also, create 2 roles.
+            'entities': {
+                'domains': {'id': DEFAULT_DOMAIN_ID, 'users': 1,
+                            'projects': {'project': 1}},
+                'roles': 2},
+            # A direct role and an inherited role on the parent
+            'assignments': [{'user': 0, 'role': 0, 'project': 0},
+                            {'user': 0, 'role': 1, 'project': 0,
+                             'inherited_to_projects': True}],
+            'tests': [
+                # List all effective assignments for user[0] - should get back
+                # one direct role plus one inherited role.
+                {'params': {'user': 0, 'effective': True},
+                 'results': [{'user': 0, 'role': 0, 'project': 0},
+                             {'user': 0, 'role': 1, 'project': 1,
+                              'indirect': {'project': 0}}]}
+            ]
+        }
+
+        test_plan_with_os_inherit_disabled = {
+            'tests': [
+                # List all effective assignments for user[0] - should only get
+                # back the one direct role.
+                {'params': {'user': 0, 'effective': True},
+                 'results': [{'user': 0, 'role': 0, 'project': 0}]}
+            ]
+        }
+        self.config_fixture.config(group='os_inherit', enabled=True)
+        test_data = self.execute_assignment_test_plan(test_plan)
+        self.config_fixture.config(group='os_inherit', enabled=False)
+        # Pass the existing test data in to allow execution of 2nd test plan
+        self.execute_assignment_tests(
+            test_plan_with_os_inherit_disabled, test_data)
+
     def test_list_projects_for_user_with_inherited_group_grants(self):
         """Test inherited group roles.
 
@@ -6441,6 +6550,53 @@ class InheritanceTests(AssignmentTestHelperMixin):
         self.assertEqual(1, len(user_projects))
         self.assertIn(root_project, user_projects)
 
+        # TODO(henry-nash): The test above uses list_projects_for_user
+        # which may, in a subsequent patch, be re-implemeted to call
+        # list_role_assignments and then report only the distinct projects.
+        #
+        # The test plan below therefore mirrors this test, to ensure that
+        # list_role_assignments works the same. Once list_projects_for_user
+        # has been re-implemented then the manual tests above can be
+        # refactored.
+        test_plan = {
+            # A domain with a project ans sub-project, plus a user.
+            # Also, create 2 roles.
+            'entities': {
+                'domains': {'id': DEFAULT_DOMAIN_ID, 'users': 1, 'groups': 1,
+                            'projects': {'project': 1}},
+                'roles': 2},
+            'group_memberships': [{'group': 0, 'users': [0]}],
+            # A direct role and an inherited role on the parent
+            'assignments': [{'group': 0, 'role': 0, 'project': 0},
+                            {'group': 0, 'role': 1, 'project': 0,
+                             'inherited_to_projects': True}],
+            'tests': [
+                # List all effective assignments for user[0] - should get back
+                # one direct role plus one inherited role.
+                {'params': {'user': 0, 'effective': True},
+                 'results': [{'user': 0, 'role': 0, 'project': 0,
+                              'indirect': {'group': 0}},
+                             {'user': 0, 'role': 1, 'project': 1,
+                              'indirect': {'group': 0, 'project': 0}}]}
+            ]
+        }
+
+        test_plan_with_os_inherit_disabled = {
+            'tests': [
+                # List all effective assignments for user[0] - should only get
+                # back the one direct role.
+                {'params': {'user': 0, 'effective': True},
+                 'results': [{'user': 0, 'role': 0, 'project': 0,
+                              'indirect': {'group': 0}}]}
+            ]
+        }
+        self.config_fixture.config(group='os_inherit', enabled=True)
+        test_data = self.execute_assignment_test_plan(test_plan)
+        self.config_fixture.config(group='os_inherit', enabled=False)
+        # Pass the existing test data in to allow execution of 2nd test plan
+        self.execute_assignment_tests(
+            test_plan_with_os_inherit_disabled, test_data)
+
 
 class FilterTests(filtering.FilterTests):
     def test_list_entities_filtered(self):
@@ -6453,7 +6609,7 @@ class FilterTests(filtering.FilterTests):
             hints.add_filter('name', entity_list[10]['name'])
             entities = self._list_entities(entity)(hints=hints)
             self.assertEqual(1, len(entities))
-            self.assertEqual(entities[0]['id'], entity_list[10]['id'])
+            self.assertEqual(entity_list[10]['id'], entities[0]['id'])
             # Check the driver has removed the filter from the list hints
             self.assertFalse(hints.get_exact_filter_by_name('name'))
             self._delete_test_data(entity, entity_list)

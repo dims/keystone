@@ -22,6 +22,7 @@ import mock
 from oslo_config import cfg
 from oslo_serialization import jsonutils
 from oslo_utils import timeutils
+from six.moves import http_client
 from six.moves import range
 import webob
 
@@ -1032,7 +1033,8 @@ class ClientDrivenTestCase(unit.TestCase):
                     (new_password, self.user_two['password']))
         self.public_server.application(req.environ,
                                        responseobject.start_fake_response)
-        self.assertEqual(403, responseobject.response_status)
+        self.assertEqual(http_client.FORBIDDEN,
+                         responseobject.response_status)
 
         self.user_two['password'] = new_password
         self.assertRaises(client_exceptions.Unauthorized,
@@ -1135,7 +1137,7 @@ class ClientDrivenTestCase(unit.TestCase):
         credentials, signature = self._generate_default_user_ec2_credentials()
         credentials['signature'] = signature
         resp, token = self._send_ec2_auth_request(credentials)
-        self.assertEqual(200, resp.status_code)
+        self.assertEqual(http_client.OK, resp.status_code)
         self.assertIn('access', token)
 
     def test_ec2_auth_success_trust(self):
@@ -1167,7 +1169,7 @@ class ClientDrivenTestCase(unit.TestCase):
             cred.access, cred.secret)
         credentials['signature'] = signature
         resp, token = self._send_ec2_auth_request(credentials)
-        self.assertEqual(200, resp.status_code)
+        self.assertEqual(http_client.OK, resp.status_code)
         self.assertEqual(trust_id, token['access']['trust']['id'])
         # TODO(shardy) we really want to check the roles and trustee
         # but because of where the stubbing happens we don't seem to

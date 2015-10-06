@@ -21,10 +21,10 @@ Developing with Keystone
 Setup
 -----
 
-Get your development environment set up according to :doc:`setup`. The
-instructions from here will assume that you have installed Keystone into a
-virtualenv. If you chose not to, simply exclude "tools/with_venv.sh" from the
-example commands below.
+Get your development environment set up according to
+:doc:`devref/development.environment`. The instructions from here will assume
+that you have installed Keystone into a virtualenv. If you chose not to, simply
+exclude "tools/with_venv.sh" from the example commands below.
 
 
 Configuring Keystone
@@ -100,7 +100,7 @@ the script, the version is the number before the underline.
 For example, if the script is named ``001_add_X_table.py`` then the
 version of the SQL migration is ``1``.
 
-.. _SQLAlchemy-migrate: http://code.google.com/p/sqlalchemy-migrate/
+.. _SQLAlchemy-migrate: https://github.com/stackforge/sqlalchemy-migrate
 
 Extensions should be created as directories under ``keystone/contrib``. An
 extension that requires SQL migrations should not change the common repository,
@@ -247,7 +247,8 @@ Running Tests
 =============
 
 Before running tests, you should have ``tox`` installed and available in your
-environment (in addition to the other external dependencies in :doc:`setup`):
+environment (in addition to the other external dependencies in
+:doc:`devref/development.environment`):
 
 .. code-block:: bash
 

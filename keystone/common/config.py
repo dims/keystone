@@ -496,7 +496,7 @@ FILE_OPTIONS = {
     'oauth1': [
         cfg.StrOpt('driver',
                    default='sql',
-                   help='Entrypoint for hte OAuth backend driver in the '
+                   help='Entrypoint for the OAuth backend driver in the '
                         'keystone.oauth1 namespace.'),
         cfg.IntOpt('request_token_duration', default=28800,
                    help='Duration (in seconds) for the OAuth Request Token.'),
@@ -529,8 +529,9 @@ FILE_OPTIONS = {
                              'token, the origin host must be a member of the '
                              'trusted_dashboard list. This configuration '
                              'option may be repeated for multiple values. '
-                             'For example: trusted_dashboard=http://acme.com '
-                             'trusted_dashboard=http://beta.com'),
+                             'For example: '
+                             'trusted_dashboard=http://acme.com/auth/websso '
+                             'trusted_dashboard=http://beta.com/auth/websso'),
         cfg.StrOpt('sso_callback_template', default=_SSO_CALLBACK,
                    help='Location of Single Sign-On callback handler, will '
                         'return a token to a trusted dashboard host.'),

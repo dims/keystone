@@ -14,6 +14,7 @@ import random
 import uuid
 
 from oslo_config import cfg
+from six.moves import http_client
 from six.moves import range
 
 from keystone.common import controller
@@ -75,9 +76,10 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             body={'domain': ref})
         self.assertValidDomainResponse(r, ref)
 
-    def test_create_domain_400(self):
+    def test_create_domain_bad_request(self):
         """Call ``POST /domains``."""
-        self.post('/domains', body={'domain': {}}, expected_status=400)
+        self.post('/domains', body={'domain': {}},
+                  expected_status=http_client.BAD_REQUEST)
 
     def test_list_domains(self):
         """Call ``GET /domains``."""
@@ -133,13 +135,14 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             }
         }
         self.admin_request(
-            path='/v2.0/tokens', method='POST', body=body, expected_status=401)
+            path='/v2.0/tokens', method='POST', body=body,
+            expected_status=http_client.UNAUTHORIZED)
 
         auth_data = self.build_authentication_request(
             user_id=self.user2['id'],
             password=self.user2['password'],
             project_id=self.project2['id'])
-        self.v3_authenticate_token(auth_data)
+        self.v3_create_token(auth_data)
 
         # Now disable the domain
         self.domain2['enabled'] = False
@@ -160,21 +163,24 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             }
         }
         self.admin_request(
-            path='/v2.0/tokens', method='POST', body=body, expected_status=401)
+            path='/v2.0/tokens', method='POST', body=body,
+            expected_status=http_client.UNAUTHORIZED)
 
         # Try looking up in v3 by name and id
         auth_data = self.build_authentication_request(
             user_id=self.user2['id'],
             password=self.user2['password'],
             project_id=self.project2['id'])
-        self.v3_authenticate_token(auth_data, expected_status=401)
+        self.v3_create_token(auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         auth_data = self.build_authentication_request(
             username=self.user2['name'],
             user_domain_id=self.domain2['id'],
             password=self.user2['password'],
             project_id=self.project2['id'])
-        self.v3_authenticate_token(auth_data, expected_status=401)
+        self.v3_create_token(auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
     def test_delete_enabled_domain_fails(self):
         """Call ``DELETE /domains/{domain_id}`` (when domain enabled)."""
@@ -257,16 +263,16 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
         # ...and that all self.domain entities are still here
         r = self.resource_api.get_domain(self.domain['id'])
-        self.assertDictEqual(r, self.domain)
+        self.assertDictEqual(self.domain, r)
         r = self.resource_api.get_project(self.project['id'])
-        self.assertDictEqual(r, self.project)
+        self.assertDictEqual(self.project, r)
         r = self.identity_api.get_group(self.group['id'])
-        self.assertDictEqual(r, self.group)
+        self.assertDictEqual(self.group, r)
         r = self.identity_api.get_user(self.user['id'])
         self.user.pop('password')
-        self.assertDictEqual(r, self.user)
+        self.assertDictEqual(self.user, r)
         r = self.credential_api.get_credential(self.credential['id'])
-        self.assertDictEqual(r, self.credential)
+        self.assertDictEqual(self.credential, r)
 
     def test_delete_default_domain_fails(self):
         # Attempting to delete the default domain results in 403 Forbidden.
@@ -357,20 +363,19 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         # validates the returned token and it should be valid.
         self.head('/auth/tokens',
                   headers={'x-subject-token': subject_token},
-                  expected_status=200)
+                  expected_status=http_client.OK)
 
         # now disable the domain
         self.domain['enabled'] = False
         url = "/domains/%(domain_id)s" % {'domain_id': self.domain['id']}
         self.patch(url,
-                   body={'domain': {'enabled': False}},
-                   expected_status=200)
+                   body={'domain': {'enabled': False}})
 
         # validates the same token again and it should be 'not found'
         # as the domain has already been disabled.
         self.head('/auth/tokens',
                   headers={'x-subject-token': subject_token},
-                  expected_status=404)
+                  expected_status=http_client.NOT_FOUND)
 
     def test_delete_domain_hierarchy(self):
         """Call ``DELETE /domains/{domain_id}``."""
@@ -485,14 +490,16 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             body={'project': ref})
         self.assertValidProjectResponse(r, ref)
 
-    def test_create_project_400(self):
+    def test_create_project_bad_request(self):
         """Call ``POST /projects``."""
-        self.post('/projects', body={'project': {}}, expected_status=400)
+        self.post('/projects', body={'project': {}},
+                  expected_status=http_client.BAD_REQUEST)
 
     def test_create_project_invalid_domain_id(self):
         """Call ``POST /projects``."""
         ref = self.new_project_ref(domain_id=uuid.uuid4().hex)
-        self.post('/projects', body={'project': ref}, expected_status=400)
+        self.post('/projects', body={'project': ref},
+                  expected_status=http_client.BAD_REQUEST)
 
     def test_create_project_is_domain_not_allowed(self):
         """Call ``POST /projects``.
@@ -504,7 +511,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         ref = self.new_project_ref(domain_id=self.domain_id, is_domain=True)
         self.post('/projects',
                   body={'project': ref},
-                  expected_status=501)
+                  expected_status=http_client.NOT_IMPLEMENTED)
 
     @utils.wip('waiting for projects acting as domains implementation')
     def test_create_project_without_parent_id_and_without_domain_id(self):
@@ -644,18 +651,20 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
     def test_get_project_with_parents_as_list_with_invalid_id(self):
         """Call ``GET /projects/{project_id}?parents_as_list``."""
         self.get('/projects/%(project_id)s?parents_as_list' % {
-                 'project_id': None}, expected_status=404)
+                 'project_id': None}, expected_status=http_client.NOT_FOUND)
 
         self.get('/projects/%(project_id)s?parents_as_list' % {
-                 'project_id': uuid.uuid4().hex}, expected_status=404)
+                 'project_id': uuid.uuid4().hex},
+                 expected_status=http_client.NOT_FOUND)
 
     def test_get_project_with_subtree_as_list_with_invalid_id(self):
         """Call ``GET /projects/{project_id}?subtree_as_list``."""
         self.get('/projects/%(project_id)s?subtree_as_list' % {
-                 'project_id': None}, expected_status=404)
+                 'project_id': None}, expected_status=http_client.NOT_FOUND)
 
         self.get('/projects/%(project_id)s?subtree_as_list' % {
-                 'project_id': uuid.uuid4().hex}, expected_status=404)
+                 'project_id': uuid.uuid4().hex},
+                 expected_status=http_client.NOT_FOUND)
 
     def test_get_project_with_parents_as_ids(self):
         """Call ``GET /projects/{project_id}?parents_as_ids``."""
@@ -766,7 +775,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         self.get(
             '/projects/%(project_id)s?parents_as_list&parents_as_ids' % {
                 'project_id': projects[1]['project']['id']},
-            expected_status=400)
+            expected_status=http_client.BAD_REQUEST)
 
     def test_get_project_with_subtree_as_ids(self):
         """Call ``GET /projects/{project_id}?subtree_as_ids``.
@@ -928,7 +937,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         self.get(
             '/projects/%(project_id)s?subtree_as_list&subtree_as_ids' % {
                 'project_id': projects[1]['project']['id']},
-            expected_status=400)
+            expected_status=http_client.BAD_REQUEST)
 
     def test_update_project(self):
         """Call ``PATCH /projects/{project_id}``."""
@@ -965,7 +974,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             '/projects/%(project_id)s' % {
                 'project_id': leaf_project['id']},
             body={'project': leaf_project},
-            expected_status=403)
+            expected_status=http_client.FORBIDDEN)
 
     def test_update_project_is_domain_not_allowed(self):
         """Call ``PATCH /projects/{project_id}`` with is_domain.
@@ -981,7 +990,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         self.patch('/projects/%(project_id)s' % {
             'project_id': resp.result['project']['id']},
             body={'project': project},
-            expected_status=400)
+            expected_status=http_client.BAD_REQUEST)
 
     def test_disable_leaf_project(self):
         """Call ``PATCH /projects/{project_id}``."""
@@ -1004,7 +1013,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             '/projects/%(project_id)s' % {
                 'project_id': root_project['id']},
             body={'project': root_project},
-            expected_status=403)
+            expected_status=http_client.FORBIDDEN)
 
     def test_delete_project(self):
         """Call ``DELETE /projects/{project_id}``
@@ -1016,7 +1025,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         """
         # First check the credential for this project is present
         r = self.credential_api.get_credential(self.credential['id'])
-        self.assertDictEqual(r, self.credential)
+        self.assertDictEqual(self.credential, r)
         # Create a second credential with a different project
         self.project2 = self.new_project_ref(
             domain_id=self.domain['id'])
@@ -1040,7 +1049,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
                           credential_id=self.credential['id'])
         # But the credential for project2 is unaffected
         r = self.credential_api.get_credential(self.credential2['id'])
-        self.assertDictEqual(r, self.credential2)
+        self.assertDictEqual(self.credential2, r)
 
     def test_delete_not_leaf_project(self):
         """Call ``DELETE /projects/{project_id}``."""
@@ -1048,7 +1057,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         self.delete(
             '/projects/%(project_id)s' % {
                 'project_id': projects[0]['project']['id']},
-            expected_status=403)
+            expected_status=http_client.FORBIDDEN)
 
     # Role CRUD tests
 
@@ -1060,9 +1069,10 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             body={'role': ref})
         return self.assertValidRoleResponse(r, ref)
 
-    def test_create_role_400(self):
+    def test_create_role_bad_request(self):
         """Call ``POST /roles``."""
-        self.post('/roles', body={'role': {}}, expected_status=400)
+        self.post('/roles', body={'role': {}},
+                  expected_status=http_client.BAD_REQUEST)
 
     def test_list_roles(self):
         """Call ``GET /roles``."""
@@ -1132,7 +1142,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         """Grant role on a project to a user that doesn't exist, 404 result.
 
         When grant a role on a project to a user that doesn't exist, the server
-        returns 404 Not Found for the user.
+        returns Not Found for the user.
 
         """
 
@@ -1145,7 +1155,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             'collection_url': collection_url,
             'role_id': self.role_id}
 
-        self.put(member_url, expected_status=404)
+        self.put(member_url, expected_status=http_client.NOT_FOUND)
 
     def test_crud_user_domain_role_grants(self):
         collection_url = (
@@ -1184,7 +1194,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             'collection_url': collection_url,
             'role_id': self.role_id}
 
-        self.put(member_url, expected_status=404)
+        self.put(member_url, expected_status=http_client.NOT_FOUND)
 
     def test_crud_group_project_role_grants(self):
         collection_url = (
@@ -1224,7 +1234,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             'collection_url': collection_url,
             'role_id': self.role_id}
 
-        self.put(member_url, expected_status=404)
+        self.put(member_url, expected_status=http_client.NOT_FOUND)
 
     def test_crud_group_domain_role_grants(self):
         collection_url = (
@@ -1264,7 +1274,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             'collection_url': collection_url,
             'role_id': self.role_id}
 
-        self.put(member_url, expected_status=404)
+        self.put(member_url, expected_status=http_client.NOT_FOUND)
 
     def _create_new_user_and_assign_role_on_project(self):
         """Create a new user and assign user a role on a project."""
@@ -1279,9 +1289,9 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         member_url = ('%(collection_url)s/%(role_id)s' % {
             'collection_url': collection_url,
             'role_id': self.role_id})
-        self.put(member_url, expected_status=204)
+        self.put(member_url)
         # Check the user has the role assigned
-        self.head(member_url, expected_status=204)
+        self.head(member_url)
         return member_url, user_ref
 
     def test_delete_user_before_removing_role_assignment_succeeds(self):
@@ -1290,9 +1300,9 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         # Delete the user from identity backend
         self.identity_api.driver.delete_user(user['id'])
         # Clean up the role assignment
-        self.delete(member_url, expected_status=204)
+        self.delete(member_url)
         # Make sure the role is gone
-        self.head(member_url, expected_status=404)
+        self.head(member_url, expected_status=http_client.NOT_FOUND)
 
     def test_delete_user_and_check_role_assignment_fails(self):
         """Call ``DELETE`` on the user and check the role assignment."""
@@ -1301,7 +1311,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         self.identity_api.delete_user(user['id'])
         # We should get a 404 when looking for the user in the identity
         # backend because we're not performing a delete operation on the role.
-        self.head(member_url, expected_status=404)
+        self.head(member_url, expected_status=http_client.NOT_FOUND)
 
     def test_token_revoked_once_group_role_grant_revoked(self):
         """Test token is revoked when group role grant is revoked
@@ -1333,7 +1343,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         # validates the returned token; it should be valid.
         self.head('/auth/tokens',
                   headers={'x-subject-token': token},
-                  expected_status=200)
+                  expected_status=http_client.OK)
 
         # revokes the grant from group on project.
         self.assignment_api.delete_grant(role_id=self.role['id'],
@@ -1343,7 +1353,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         # validates the same token again; it should not longer be valid.
         self.head('/auth/tokens',
                   headers={'x-subject-token': token},
-                  expected_status=404)
+                  expected_status=http_client.NOT_FOUND)
 
     # Role Assignments tests
 
@@ -1858,7 +1868,7 @@ class RoleAssignmentBaseTestCase(test_v3.RestfulTestCase,
         self.default_user_id = self.user_ids[0]
         self.default_group_id = self.group_ids[0]
 
-    def get_role_assignments(self, expected_status=200, **filters):
+    def get_role_assignments(self, expected_status=http_client.OK, **filters):
         """Returns the result from querying role assignment API + queried URL.
 
         Calls GET /v3/role_assignments?<params> and returns its result, where
@@ -1903,24 +1913,24 @@ class RoleAssignmentFailureTestCase(RoleAssignmentBaseTestCase):
     def test_get_role_assignments_by_domain_and_project(self):
         self.get_role_assignments(domain_id=self.domain_id,
                                   project_id=self.project_id,
-                                  expected_status=400)
+                                  expected_status=http_client.BAD_REQUEST)
 
     def test_get_role_assignments_by_user_and_group(self):
         self.get_role_assignments(user_id=self.default_user_id,
                                   group_id=self.default_group_id,
-                                  expected_status=400)
+                                  expected_status=http_client.BAD_REQUEST)
 
     def test_get_role_assignments_by_effective_and_inherited(self):
         self.config_fixture.config(group='os_inherit', enabled=True)
 
         self.get_role_assignments(domain_id=self.domain_id, effective=True,
                                   inherited_to_projects=True,
-                                  expected_status=400)
+                                  expected_status=http_client.BAD_REQUEST)
 
     def test_get_role_assignments_by_effective_and_group(self):
         self.get_role_assignments(effective=True,
                                   group_id=self.default_group_id,
-                                  expected_status=400)
+                                  expected_status=http_client.BAD_REQUEST)
 
 
 class RoleAssignmentDirectTestCase(RoleAssignmentBaseTestCase):
@@ -2193,8 +2203,10 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
             project_id=self.project_id)
 
         # Check the user cannot get a domain nor a project token
-        self.v3_authenticate_token(domain_auth_data, expected_status=401)
-        self.v3_authenticate_token(project_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Grant non-inherited role for user on domain
         non_inher_ud_link = self.build_role_assignment_link(
@@ -2202,8 +2214,9 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(non_inher_ud_link)
 
         # Check the user can get only a domain token
-        self.v3_authenticate_token(domain_auth_data)
-        self.v3_authenticate_token(project_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data)
+        self.v3_create_token(project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Create inherited role
         inherited_role = {'id': uuid.uuid4().hex, 'name': 'inherited'}
@@ -2216,21 +2229,23 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(inher_ud_link)
 
         # Check the user can get both a domain and a project token
-        self.v3_authenticate_token(domain_auth_data)
-        self.v3_authenticate_token(project_auth_data)
+        self.v3_create_token(domain_auth_data)
+        self.v3_create_token(project_auth_data)
 
         # Delete inherited grant
         self.delete(inher_ud_link)
 
         # Check the user can only get a domain token
-        self.v3_authenticate_token(domain_auth_data)
-        self.v3_authenticate_token(project_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data)
+        self.v3_create_token(project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Delete non-inherited grant
         self.delete(non_inher_ud_link)
 
         # Check the user cannot get a domain token anymore
-        self.v3_authenticate_token(domain_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
     def test_get_token_from_inherited_group_domain_role_grants(self):
         # Create a new group and put a new user in it to
@@ -2255,8 +2270,10 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
             project_id=self.project_id)
 
         # Check the user cannot get a domain nor a project token
-        self.v3_authenticate_token(domain_auth_data, expected_status=401)
-        self.v3_authenticate_token(project_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Grant non-inherited role for user on domain
         non_inher_gd_link = self.build_role_assignment_link(
@@ -2264,8 +2281,9 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(non_inher_gd_link)
 
         # Check the user can get only a domain token
-        self.v3_authenticate_token(domain_auth_data)
-        self.v3_authenticate_token(project_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data)
+        self.v3_create_token(project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Create inherited role
         inherited_role = {'id': uuid.uuid4().hex, 'name': 'inherited'}
@@ -2278,21 +2296,23 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(inher_gd_link)
 
         # Check the user can get both a domain and a project token
-        self.v3_authenticate_token(domain_auth_data)
-        self.v3_authenticate_token(project_auth_data)
+        self.v3_create_token(domain_auth_data)
+        self.v3_create_token(project_auth_data)
 
         # Delete inherited grant
         self.delete(inher_gd_link)
 
         # Check the user can only get a domain token
-        self.v3_authenticate_token(domain_auth_data)
-        self.v3_authenticate_token(project_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data)
+        self.v3_create_token(project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Delete non-inherited grant
         self.delete(non_inher_gd_link)
 
         # Check the user cannot get a domain token anymore
-        self.v3_authenticate_token(domain_auth_data, expected_status=401)
+        self.v3_create_token(domain_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
     def _test_crud_inherited_and_direct_assignment_on_target(self, target_url):
         # Create a new role to avoid assignments loaded from sample data
@@ -2308,7 +2328,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(direct_url)
         # Check the direct assignment exists, but the inherited one does not
         self.head(direct_url)
-        self.head(inherited_url, expected_status=404)
+        self.head(inherited_url, expected_status=http_client.NOT_FOUND)
 
         # Now add the inherited assignment
         self.put(inherited_url)
@@ -2320,13 +2340,13 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.delete(inherited_url)
         # Check the direct assignment exists, but the inherited one does not
         self.head(direct_url)
-        self.head(inherited_url, expected_status=404)
+        self.head(inherited_url, expected_status=http_client.NOT_FOUND)
 
         # Now delete the inherited assignment
         self.delete(direct_url)
         # Check that none of them exist
-        self.head(direct_url, expected_status=404)
-        self.head(inherited_url, expected_status=404)
+        self.head(direct_url, expected_status=http_client.NOT_FOUND)
+        self.head(inherited_url, expected_status=http_client.NOT_FOUND)
 
     def test_crud_inherited_and_direct_assignment_on_domains(self):
         self._test_crud_inherited_and_direct_assignment_on_target(
@@ -2801,8 +2821,10 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
             project_id=leaf_id)
 
         # Check the user cannot get a token on root nor leaf project
-        self.v3_authenticate_token(root_project_auth_data, expected_status=401)
-        self.v3_authenticate_token(leaf_project_auth_data, expected_status=401)
+        self.v3_create_token(root_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(leaf_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Grant non-inherited role for user on leaf project
         non_inher_up_link = self.build_role_assignment_link(
@@ -2811,8 +2833,9 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(non_inher_up_link)
 
         # Check the user can only get a token on leaf project
-        self.v3_authenticate_token(root_project_auth_data, expected_status=401)
-        self.v3_authenticate_token(leaf_project_auth_data)
+        self.v3_create_token(root_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(leaf_project_auth_data)
 
         # Grant inherited role for user on root project
         inher_up_link = self.build_role_assignment_link(
@@ -2821,21 +2844,24 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(inher_up_link)
 
         # Check the user still can get a token only on leaf project
-        self.v3_authenticate_token(root_project_auth_data, expected_status=401)
-        self.v3_authenticate_token(leaf_project_auth_data)
+        self.v3_create_token(root_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(leaf_project_auth_data)
 
         # Delete non-inherited grant
         self.delete(non_inher_up_link)
 
         # Check the inherited role still applies for leaf project
-        self.v3_authenticate_token(root_project_auth_data, expected_status=401)
-        self.v3_authenticate_token(leaf_project_auth_data)
+        self.v3_create_token(root_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(leaf_project_auth_data)
 
         # Delete inherited grant
         self.delete(inher_up_link)
 
         # Check the user cannot get a token on leaf project anymore
-        self.v3_authenticate_token(leaf_project_auth_data, expected_status=401)
+        self.v3_create_token(leaf_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
     def test_get_token_from_inherited_group_project_role_grants(self):
         # Create default scenario
@@ -2858,8 +2884,10 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
             project_id=leaf_id)
 
         # Check the user cannot get a token on root nor leaf project
-        self.v3_authenticate_token(root_project_auth_data, expected_status=401)
-        self.v3_authenticate_token(leaf_project_auth_data, expected_status=401)
+        self.v3_create_token(root_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(leaf_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
         # Grant non-inherited role for group on leaf project
         non_inher_gp_link = self.build_role_assignment_link(
@@ -2868,8 +2896,9 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(non_inher_gp_link)
 
         # Check the user can only get a token on leaf project
-        self.v3_authenticate_token(root_project_auth_data, expected_status=401)
-        self.v3_authenticate_token(leaf_project_auth_data)
+        self.v3_create_token(root_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(leaf_project_auth_data)
 
         # Grant inherited role for group on root project
         inher_gp_link = self.build_role_assignment_link(
@@ -2878,20 +2907,22 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.put(inher_gp_link)
 
         # Check the user still can get a token only on leaf project
-        self.v3_authenticate_token(root_project_auth_data, expected_status=401)
-        self.v3_authenticate_token(leaf_project_auth_data)
+        self.v3_create_token(root_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
+        self.v3_create_token(leaf_project_auth_data)
 
         # Delete no-inherited grant
         self.delete(non_inher_gp_link)
 
         # Check the inherited role still applies for leaf project
-        self.v3_authenticate_token(leaf_project_auth_data)
+        self.v3_create_token(leaf_project_auth_data)
 
         # Delete inherited grant
         self.delete(inher_gp_link)
 
         # Check the user cannot get a token on leaf project anymore
-        self.v3_authenticate_token(leaf_project_auth_data, expected_status=401)
+        self.v3_create_token(leaf_project_auth_data,
+                             expected_status=http_client.UNAUTHORIZED)
 
     def test_get_role_assignments_for_project_hierarchy(self):
         """Call ``GET /role_assignments``.
@@ -3069,10 +3100,10 @@ class AssignmentInheritanceDisabledTestCase(test_v3.RestfulTestCase):
             'role_id': role['id']}
         collection_url = base_collection_url + '/inherited_to_projects'
 
-        self.put(member_url, expected_status=404)
-        self.head(member_url, expected_status=404)
-        self.get(collection_url, expected_status=404)
-        self.delete(member_url, expected_status=404)
+        self.put(member_url, expected_status=http_client.NOT_FOUND)
+        self.head(member_url, expected_status=http_client.NOT_FOUND)
+        self.get(collection_url, expected_status=http_client.NOT_FOUND)
+        self.delete(member_url, expected_status=http_client.NOT_FOUND)
 
 
 class AssignmentV3toV2MethodsTestCase(unit.TestCase):
@@ -3111,11 +3142,11 @@ class AssignmentV3toV2MethodsTestCase(unit.TestCase):
 
         updated_ref = controller.V2Controller.filter_domain_id(ref)
         self.assertIs(ref, updated_ref)
-        self.assertDictEqual(ref, expected_ref)
+        self.assertDictEqual(expected_ref, ref)
         # Make sure we don't error/muck up data if domain_id isn't present
         updated_ref = controller.V2Controller.filter_domain_id(ref_no_domain)
         self.assertIs(ref_no_domain, updated_ref)
-        self.assertDictEqual(ref_no_domain, expected_ref)
+        self.assertDictEqual(expected_ref, ref_no_domain)
 
     def test_v3controller_filter_domain_id(self):
         # No data should be filtered out in this case.
@@ -3127,7 +3158,7 @@ class AssignmentV3toV2MethodsTestCase(unit.TestCase):
         expected_ref = ref.copy()
         updated_ref = controller.V3Controller.filter_domain_id(ref)
         self.assertIs(ref, updated_ref)
-        self.assertDictEqual(ref, expected_ref)
+        self.assertDictEqual(expected_ref, ref)
 
     def test_v2controller_filter_domain(self):
         other_data = uuid.uuid4().hex
@@ -3154,27 +3185,27 @@ class AssignmentV3toV2MethodsTestCase(unit.TestCase):
 
         updated_ref = controller.V2Controller.filter_project_parent_id(ref)
         self.assertIs(ref, updated_ref)
-        self.assertDictEqual(ref, expected_ref)
+        self.assertDictEqual(expected_ref, ref)
         # Make sure we don't error/muck up data if parent_id isn't present
         updated_ref = controller.V2Controller.filter_project_parent_id(
             ref_no_parent)
         self.assertIs(ref_no_parent, updated_ref)
-        self.assertDictEqual(ref_no_parent, expected_ref)
+        self.assertDictEqual(expected_ref, ref_no_parent)
 
     def test_v3_to_v2_project_method(self):
         self._setup_initial_projects()
         updated_project1 = controller.V2Controller.v3_to_v2_project(
             self.project1)
         self.assertIs(self.project1, updated_project1)
-        self.assertDictEqual(self.project1, self.expected_project)
+        self.assertDictEqual(self.expected_project, self.project1)
         updated_project2 = controller.V2Controller.v3_to_v2_project(
             self.project2)
         self.assertIs(self.project2, updated_project2)
-        self.assertDictEqual(self.project2, self.expected_project)
+        self.assertDictEqual(self.expected_project, self.project2)
         updated_project3 = controller.V2Controller.v3_to_v2_project(
             self.project3)
         self.assertIs(self.project3, updated_project3)
-        self.assertDictEqual(self.project3, self.expected_project)
+        self.assertDictEqual(self.expected_project, self.project2)
 
     def test_v3_to_v2_project_method_list(self):
         self._setup_initial_projects()
@@ -3187,6 +3218,6 @@ class AssignmentV3toV2MethodsTestCase(unit.TestCase):
             # Order should not change.
             self.assertIs(ref, project_list[i])
 
-        self.assertDictEqual(self.project1, self.expected_project)
-        self.assertDictEqual(self.project2, self.expected_project)
-        self.assertDictEqual(self.project3, self.expected_project)
+        self.assertDictEqual(self.expected_project, self.project1)
+        self.assertDictEqual(self.expected_project, self.project2)
+        self.assertDictEqual(self.expected_project, self.project3)

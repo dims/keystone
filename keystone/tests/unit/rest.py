@@ -13,6 +13,7 @@
 # under the License.
 
 from oslo_serialization import jsonutils
+from six.moves import http_client
 import webtest
 
 from keystone.auth import controllers as auth_controllers
@@ -113,11 +114,10 @@ class RestfulTestCase(unit.TestCase):
 
         example::
 
-            self.assertResponseStatus(response, 204)
+            self.assertResponseStatus(response, http_client.NO_CONTENT)
         """
         self.assertEqual(
-            response.status_code,
-            expected_status,
+            expected_status, response.status_code,
             'Status code %s is not %s, as expected\n\n%s' %
             (response.status_code, expected_status, response.body))
 
@@ -125,15 +125,16 @@ class RestfulTestCase(unit.TestCase):
         """Ensures that response headers appear as expected."""
         self.assertIn('X-Auth-Token', response.headers.get('Vary'))
 
-    def assertValidErrorResponse(self, response, expected_status=400):
+    def assertValidErrorResponse(self, response,
+                                 expected_status=http_client.BAD_REQUEST):
         """Verify that the error response is valid.
 
         Subclasses can override this function based on the expected response.
 
         """
-        self.assertEqual(response.status_code, expected_status)
+        self.assertEqual(expected_status, response.status_code)
         error = response.result['error']
-        self.assertEqual(error['code'], response.status_code)
+        self.assertEqual(response.status_code, error['code'])
         self.assertIsNotNone(error.get('title'))
 
     def _to_content_type(self, body, headers, content_type=None):
@@ -184,7 +185,8 @@ class RestfulTestCase(unit.TestCase):
         self._from_content_type(response, content_type=response_content_type)
 
         # we can save some code & improve coverage by always doing this
-        if method != 'HEAD' and response.status_code >= 400:
+        if (method != 'HEAD' and
+                response.status_code >= http_client.BAD_REQUEST):
             self.assertValidErrorResponse(response)
 
         # Contains the decoded response.body
