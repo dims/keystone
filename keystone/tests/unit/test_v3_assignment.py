@@ -1139,7 +1139,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         # self.assertIn(collection_url, r.result['links']['self'])
 
     def test_crud_user_project_role_grants_no_user(self):
-        """Grant role on a project to a user that doesn't exist, 404 result.
+        """Grant role on a project to a user that doesn't exist.
 
         When grant a role on a project to a user that doesn't exist, the server
         returns Not Found for the user.
@@ -1178,7 +1178,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
                                          resource_url=collection_url)
 
     def test_crud_user_domain_role_grants_no_user(self):
-        """Grant role on a domain to a user that doesn't exist, 404 result.
+        """Grant role on a domain to a user that doesn't exist.
 
         When grant a role on a domain to a user that doesn't exist, the server
         returns 404 Not Found for the user.
@@ -1217,7 +1217,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
                                          resource_url=collection_url)
 
     def test_crud_group_project_role_grants_no_group(self):
-        """Grant role on a project to a group that doesn't exist, 404 result.
+        """Grant role on a project to a group that doesn't exist.
 
         When grant a role on a project to a group that doesn't exist, the
         server returns 404 Not Found for the group.
@@ -1257,7 +1257,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
                                          resource_url=collection_url)
 
     def test_crud_group_domain_role_grants_no_group(self):
-        """Grant role on a domain to a group that doesn't exist, 404 result.
+        """Grant role on a domain to a group that doesn't exist.
 
         When grant a role on a domain to a group that doesn't exist, the server
         returns 404 Not Found for the group.
@@ -1309,8 +1309,9 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         member_url, user = self._create_new_user_and_assign_role_on_project()
         # Delete the user from identity backend
         self.identity_api.delete_user(user['id'])
-        # We should get a 404 when looking for the user in the identity
-        # backend because we're not performing a delete operation on the role.
+        # We should get a 404 Not Found when looking for the user in the
+        # identity backend because we're not performing a delete operation on
+        # the role.
         self.head(member_url, expected_status=http_client.NOT_FOUND)
 
     def test_token_revoked_once_group_role_grant_revoked(self):
@@ -1902,11 +1903,11 @@ class RoleAssignmentBaseTestCase(test_v3.RestfulTestCase,
 class RoleAssignmentFailureTestCase(RoleAssignmentBaseTestCase):
     """Class for testing invalid query params on /v3/role_assignments API.
 
-    Querying domain and project, or user and group results in a HTTP 400, since
-    a role assignment must contain only a single pair of (actor, target). In
-    addition, since filtering on role assignments applies only to the final
-    result, effective mode cannot be combined with i) group or ii) domain and
-    inherited, because it would always result in an empty list.
+    Querying domain and project, or user and group results in a HTTP 400 Bad
+    Request, since a role assignment must contain only a single pair of (actor,
+    target). In addition, since filtering on role assignments applies only to
+    the final result, effective mode cannot be combined with i) group or ii)
+    domain and inherited, because it would always result in an empty list.
 
     """
 

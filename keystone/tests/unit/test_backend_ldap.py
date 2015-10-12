@@ -2086,6 +2086,38 @@ class LDAPIdentity(BaseLDAPIdentity, unit.TestCase):
         self.assertEqual('Foo Bar', user_ref['name'])
 
 
+class LDAPUserList(unit.TestCase):
+
+    def setUp(self):
+        super(LDAPUserList, self).setUp()
+        self.ldapdb = self.useFixture(ldapdb.LDAPDatabase())
+
+        self.load_backends()
+        self.load_fixtures(default_fixtures)
+        _assert_backends(self,
+                         assignment='ldap',
+                         identity='ldap',
+                         resource='ldap')
+
+    def config_overrides(self):
+        super(LDAPUserList, self).config_overrides()
+        self.config_fixture.config(group='identity', driver='ldap')
+        self.config_fixture.config(group='identity',
+                                   list_limit=len(default_fixtures.USERS) - 1)
+
+    def config_files(self):
+        config_files = super(LDAPUserList, self).config_files()
+        config_files.append(unit.dirs.tests_conf('backend_ldap.conf'))
+        return config_files
+
+    def test_returned_list_size_is_limited(self):
+        users = self.identity_api.list_users()
+        # NOTE(amakarov): this exposes bug 1501698
+        # list_limit number of entries should be returned
+        self.assertNotEqual(CONF.identity.list_limit, len(users))
+        self.assertEqual(len(default_fixtures.USERS), len(users))
+
+
 class LDAPIdentityEnabledEmulation(LDAPIdentity):
     def setUp(self):
         super(LDAPIdentityEnabledEmulation, self).setUp()
@@ -3171,10 +3203,10 @@ class DomainSpecificLDAPandSQLIdentity(
                 domain_scope=self.domains['domain1']['id']),
             matchers.HasLength(1))
 
-    def test_add_role_grant_to_user_and_project_404(self):
+    def test_add_role_grant_to_user_and_project_returns_not_found(self):
         self.skipTest('Blocked by bug 1101287')
 
-    def test_get_role_grants_for_user_and_project_404(self):
+    def test_get_role_grants_for_user_and_project_returns_not_found(self):
         self.skipTest('Blocked by bug 1101287')
 
     def test_list_projects_for_user_with_grants(self):
