@@ -18,8 +18,10 @@ stevedore>=1.5.0 # Apache-2.0
 passlib>=1.6
 python-keystoneclient>=1.6.0
 keystonemiddleware>=2.0.0
+
 -e git+https://github.com/openstack/oslo.concurrency.git#egg=oslo.concurrency
 -e git+https://github.com/openstack/oslo.config.git#egg=oslo.config
+-e git+https://github.com/openstack/oslo.context.git#egg=oslo.context
 -e git+https://github.com/openstack/oslo.messaging.git#egg=oslo.messaging
 -e git+https://github.com/openstack/oslo.db.git#egg=oslo.db
 -e git+https://github.com/openstack/oslo.i18n.git#egg=oslo.i18n
@@ -29,6 +31,7 @@ keystonemiddleware>=2.0.0
 -e git+https://github.com/openstack/oslo.serialization.git#egg=oslo.serialization
 -e git+https://github.com/openstack/oslo.service.git#egg=oslo.service
 -e git+https://github.com/openstack/oslo.utils.git#egg=oslo.utils
+
 oauthlib>=0.6
 pysaml2>=2.4.0
 dogpile.cache>=0.5.4
