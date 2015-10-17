@@ -7,6 +7,7 @@ WebOb>=1.2.3
 eventlet>=0.17.4
 greenlet>=0.3.2
 
+-e git+https://github.com/openstack/oslo.cache.git#egg=oslo.cache
 -e git+https://github.com/openstack/oslo.concurrency.git#egg=oslo.concurrency
 -e git+https://github.com/openstack/oslo.config.git#egg=oslo.config
 -e git+https://github.com/openstack/oslo.context.git#egg=oslo.context
