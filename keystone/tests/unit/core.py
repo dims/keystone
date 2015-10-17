@@ -51,13 +51,13 @@ from keystone.common import kvs
 from keystone.common.kvs import core as kvs_core
 from keystone.common import sql
 from keystone import config
-from keystone import controllers
 from keystone import exception
 from keystone import notifications
 from keystone.policy.backends import rules
 from keystone.server import common
-from keystone import service
 from keystone.tests.unit import ksfixtures
+from keystone.version import controllers
+from keystone.version import service
 
 
 config.configure()
@@ -411,7 +411,7 @@ class TestCase(BaseTestCase):
             group='cache',
             backend='dogpile.cache.memory',
             enabled=True,
-            proxies=['keystone.tests.unit.test_cache.CacheIsolatingProxy'])
+            proxies=['oslo_cache.testing.CacheIsolatingProxy'])
         self.config_fixture.config(
             group='catalog',
             driver='templated',
