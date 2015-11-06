@@ -12,9 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-"""
-Keystone Memcached dogpile.cache backend implementation.
-"""
+"""Keystone Memcached dogpile.cache backend implementation."""
 
 import random as _random
 import time
@@ -49,6 +47,7 @@ class MemcachedLock(object):
     http://amix.dk/blog/post/19386
 
     """
+
     def __init__(self, client_fn, key, lock_timeout, max_lock_attempts):
         self.client_fn = client_fn
         self.key = "_lock" + key
@@ -83,6 +82,7 @@ class MemcachedBackend(object):
     time `memcached`, `bmemcached`, `pylibmc` and `pooled_memcached` are
     valid).
     """
+
     def __init__(self, arguments):
         self._key_mangler = None
         self.raw_no_expiry_keys = set(arguments.pop('no_expiry_keys', set()))

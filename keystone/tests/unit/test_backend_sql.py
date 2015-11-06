@@ -748,7 +748,6 @@ class SqlFilterTests(SqlTests, test_backend.FilterTests):
 
     def clean_up_entities(self):
         """Clean up entity test data from Filter Test Cases."""
-
         for entity in ['user', 'group', 'project']:
             self._delete_test_data(entity, self.entity_list[entity])
             self._delete_test_data(entity, self.domain1_entity_list[entity])
@@ -849,11 +848,6 @@ class SqlDecorators(unit.TestCase):
     def test_initialization(self):
         tt = FakeTable(col='a')
         self.assertEqual('a', tt.col)
-
-    def test_non_ascii_init(self):
-        # NOTE(I159): Non ASCII characters must cause UnicodeDecodeError
-        # if encoding is not provided explicitly.
-        self.assertRaises(UnicodeDecodeError, FakeTable, col='Я')
 
     def test_conflict_happend(self):
         self.assertRaises(exception.Conflict, FakeTable().insert)

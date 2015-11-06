@@ -115,8 +115,7 @@ class CatalogTestCase(test_v3.RestfulTestCase):
         self.assertValidRegionResponse(r, ref)
 
     def test_create_regions_with_same_description_string(self):
-        """Call ``POST /regions`` with same description in the request bodies.
-        """
+        """Call ``POST /regions`` with duplicate descriptions."""
         # NOTE(lbragstad): Make sure we can create two regions that have the
         # same description.
         ref1 = self.new_region_ref()
@@ -134,8 +133,7 @@ class CatalogTestCase(test_v3.RestfulTestCase):
         self.assertValidRegionResponse(resp2, ref2)
 
     def test_create_regions_without_descriptions(self):
-        """Call ``POST /regions`` with no description in the request bodies.
-        """
+        """Call ``POST /regions`` with no description."""
         # NOTE(lbragstad): Make sure we can create two regions that have
         # no description in the request body. The description should be
         # populated by Catalog Manager.
@@ -240,7 +238,6 @@ class CatalogTestCase(test_v3.RestfulTestCase):
 
     def test_delete_region(self):
         """Call ``DELETE /regions/{region_id}``."""
-
         ref = self.new_region_ref()
         r = self.post(
             '/regions',
@@ -759,8 +756,7 @@ class CatalogTestCase(test_v3.RestfulTestCase):
         self.post('/endpoints', body={'endpoint': ref})
 
     def test_endpoint_create_with_invalid_url(self):
-        """Test the invalid cases: substitutions is not exactly right.
-        """
+        """Test the invalid cases: substitutions is not exactly right."""
         invalid_urls = [
             # using a substitution that is not whitelisted - KeyError
             'http://127.0.0.1:8774/v1.1/$(nonexistent)s',
@@ -785,9 +781,7 @@ class CatalogTestCase(test_v3.RestfulTestCase):
 
 
 class TestCatalogAPISQL(unit.TestCase):
-    """Tests for the catalog Manager against the SQL backend.
-
-    """
+    """Tests for the catalog Manager against the SQL backend."""
 
     def setUp(self):
         super(TestCatalogAPISQL, self).setUp()
@@ -853,7 +847,8 @@ class TestCatalogAPISQL(unit.TestCase):
 
         # If the URL has no 'tenant_id' to substitute, we will skip the
         # endpoint which contains this kind of URL, negative check.
-        catalog = self.catalog_api.get_v3_catalog(user_id, tenant_id=None)
+        tenant_id = None
+        catalog = self.catalog_api.get_v3_catalog(user_id, tenant_id)
         self.assertThat(catalog[0]['endpoints'], matchers.HasLength(1))
 
     def test_get_catalog_always_returns_service_name(self):
@@ -893,9 +888,7 @@ class TestCatalogAPISQL(unit.TestCase):
 # TODO(dstanek): this needs refactoring with the test above, but we are in a
 # crunch so that will happen in a future patch.
 class TestCatalogAPISQLRegions(unit.TestCase):
-    """Tests for the catalog Manager against the SQL backend.
-
-    """
+    """Tests for the catalog Manager against the SQL backend."""
 
     def setUp(self):
         super(TestCatalogAPISQLRegions, self).setUp()

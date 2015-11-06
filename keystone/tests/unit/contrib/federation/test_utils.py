@@ -50,7 +50,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         a direct mapping for the users name.
 
         """
-
         mapping = mapping_fixtures.MAPPING_LARGE
         assertion = mapping_fixtures.ADMIN_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -74,7 +73,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         RuleProcessor should return list of empty group_ids.
 
         """
-
         mapping = mapping_fixtures.MAPPING_LARGE
         assertion = mapping_fixtures.BAD_TESTER_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -93,7 +91,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         a match.
 
         """
-
         mapping = mapping_fixtures.MAPPING_TESTER_REGEX
         assertion = mapping_fixtures.TESTER_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -116,7 +113,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         mapping.
 
         """
-
         mapping = mapping_fixtures.MAPPING_SMALL
         assertion = mapping_fixtures.CONTRACTOR_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -138,7 +134,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         has `not_any_of`, and direct mapping to a username, no group.
 
         """
-
         mapping = mapping_fixtures.MAPPING_LARGE
         assertion = mapping_fixtures.CUSTOMER_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -160,7 +155,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         rules must be matched, including a `not_any_of`.
 
         """
-
         mapping = mapping_fixtures.MAPPING_SMALL
         assertion = mapping_fixtures.EMPLOYEE_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -183,7 +177,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         regex set to True.
 
         """
-
         mapping = mapping_fixtures.MAPPING_DEVELOPER_REGEX
         assertion = mapping_fixtures.DEVELOPER_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -206,7 +199,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         RuleProcessor should return list of empty group_ids.
 
         """
-
         mapping = mapping_fixtures.MAPPING_DEVELOPER_REGEX
         assertion = mapping_fixtures.BAD_DEVELOPER_ASSERTION
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -223,7 +215,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         Expect DEVELOPER_GROUP_ID and TESTER_GROUP_ID in the results.
 
         """
-
         mapping = mapping_fixtures.MAPPING_LARGE
         rp = mapping_utils.RuleProcessor(mapping['rules'])
         values = rp.process(assertion)
@@ -317,7 +308,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         correctly filters out Manager and only allows Developer and Contractor.
 
         """
-
         mapping = mapping_fixtures.MAPPING_GROUPS_WHITELIST
         assertion = mapping_fixtures.EMPLOYEE_ASSERTION_MULTIPLE_GROUPS
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -354,7 +344,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         correctly filters out Manager and Developer and only allows Contractor.
 
         """
-
         mapping = mapping_fixtures.MAPPING_GROUPS_BLACKLIST
         assertion = mapping_fixtures.EMPLOYEE_ASSERTION_MULTIPLE_GROUPS
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -383,7 +372,6 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         entry in the remote rules.
 
         """
-
         mapping = mapping_fixtures.MAPPING_GROUPS_BLACKLIST_MULTIPLES
         assertion = mapping_fixtures.EMPLOYEE_ASSERTION_MULTIPLE_GROUPS
         rp = mapping_utils.RuleProcessor(mapping['rules'])
@@ -444,7 +432,7 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         self.assertEqual('tbo', mapped_properties['user']['name'])
 
     def test_mapping_federated_domain_specified(self):
-        """Test mapping engine when domain 'ephemeral' is explicitely set.
+        """Test mapping engine when domain 'ephemeral' is explicitly set.
 
         For that, we use mapping rule MAPPING_EPHEMERAL_USER and assertion
         EMPLOYEE_ASSERTION
@@ -515,7 +503,7 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         - Check if the user has property type set ('ephemeral')
         - Check if user's name is properly mapped from the assertion
         - Check if user's id is properly set and equal to name, as it was not
-        explicitely specified in the mapping.
+        explicitly specified in the mapping.
 
         """
         mapping = mapping_fixtures.MAPPING_USER_IDS
@@ -538,7 +526,7 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         - Check if the user has propert type set ('ephemeral')
         - Check if user's name is properly mapped from the assertion
         - Check if user's id is properly set and equal to name, as it was not
-        explicitely specified in the mapping.
+        explicitly specified in the mapping.
 
         """
         mapping = mapping_fixtures.MAPPING_USER_IDS
@@ -562,7 +550,7 @@ class MappingRuleEngineTests(unit.BaseTestCase):
         - Check if the user has propert type set ('ephemeral')
         - Check if user's id is properly mapped from the assertion
         - Check if user's name is properly set and equal to id, as it was not
-        explicitely specified in the mapping.
+        explicitly specified in the mapping.
 
         """
         mapping = mapping_fixtures.MAPPING_USER_IDS

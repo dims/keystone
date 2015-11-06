@@ -37,6 +37,7 @@ def _parse_and_normalize_time(time_data):
 
 class KeystoneToken(dict):
     """An in-memory representation that unifies v2 and v3 tokens."""
+
     # TODO(morganfainberg): Align this in-memory representation with the
     # objects in keystoneclient. This object should be eventually updated
     # to be the source of token data with the ability to emit any version
@@ -116,7 +117,7 @@ class KeystoneToken(dict):
                 return self['user']['domain']['name']
             elif 'user' in self:
                 return "Default"
-        except KeyError:
+        except KeyError:  # nosec
             # Do not raise KeyError, raise UnexpectedError
             pass
         raise exception.UnexpectedError()
@@ -128,7 +129,7 @@ class KeystoneToken(dict):
                 return self['user']['domain']['id']
             elif 'user' in self:
                 return CONF.identity.default_domain_id
-        except KeyError:
+        except KeyError:  # nosec
             # Do not raise KeyError, raise UnexpectedError
             pass
         raise exception.UnexpectedError()
@@ -184,7 +185,7 @@ class KeystoneToken(dict):
                 return self['project']['domain']['id']
             elif 'tenant' in self['token']:
                 return CONF.identity.default_domain_id
-        except KeyError:
+        except KeyError:  # nosec
             # Do not raise KeyError, raise UnexpectedError
             pass
 
@@ -197,7 +198,7 @@ class KeystoneToken(dict):
                 return self['project']['domain']['name']
             if 'tenant' in self['token']:
                 return 'Default'
-        except KeyError:
+        except KeyError:  # nosec
             # Do not raise KeyError, raise UnexpectedError
             pass
 

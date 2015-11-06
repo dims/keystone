@@ -111,7 +111,8 @@ class Manager(manager.Manager):
                                                   tenant_id=project_ref['id'])
                 role_list = self._roles_from_role_dicts(
                     metadata_ref.get('roles', {}), False)
-            except exception.MetadataNotFound:
+            except exception.MetadataNotFound:  # nosec: No metadata so no
+                # roles.
                 pass
 
             if CONF.os_inherit.enabled:
@@ -121,7 +122,10 @@ class Manager(manager.Manager):
                         user_id=user_id, domain_id=project_ref['domain_id'])
                     role_list += self._roles_from_role_dicts(
                         metadata_ref.get('roles', {}), True)
-                except (exception.MetadataNotFound, exception.NotImplemented):
+                except (exception.MetadataNotFound,  # nosec : No metadata or
+                        # the backend doesn't support the role ops, so no
+                        # roles.
+                        exception.NotImplemented):
                     pass
                 # As well inherited roles from parent projects
                 for p in self.resource_api.list_project_parents(
@@ -147,7 +151,6 @@ class Manager(manager.Manager):
                  keystone.exception.DomainNotFound
 
         """
-
         def _get_group_domain_roles(user_id, domain_id):
             role_list = []
             group_ids = self._get_group_ids_for_user_id(user_id)
@@ -157,7 +160,8 @@ class Manager(manager.Manager):
                                                       domain_id=domain_id)
                     role_list += self._roles_from_role_dicts(
                         metadata_ref.get('roles', {}), False)
-                except (exception.MetadataNotFound, exception.NotImplemented):
+                except (exception.MetadataNotFound,  # nosec
+                        exception.NotImplemented):
                     # MetadataNotFound implies no group grant, so skip.
                     # Ignore NotImplemented since not all backends support
                     # domains.
@@ -169,7 +173,8 @@ class Manager(manager.Manager):
             try:
                 metadata_ref = self._get_metadata(user_id=user_id,
                                                   domain_id=domain_id)
-            except (exception.MetadataNotFound, exception.NotImplemented):
+            except (exception.MetadataNotFound,  # nosec
+                    exception.NotImplemented):
                 # MetadataNotFound implies no user grants.
                 # Ignore NotImplemented since not all backends support
                 # domains
@@ -185,7 +190,6 @@ class Manager(manager.Manager):
 
     def get_roles_for_groups(self, group_ids, project_id=None, domain_id=None):
         """Get a list of roles for this group on domain and/or project."""
-
         if project_id is not None:
             project = self.resource_api.get_project(project_id)
             role_ids = self.list_role_ids_for_groups_on_project(
@@ -509,10 +513,8 @@ class Manager(manager.Manager):
         filter the result on those values.
 
         """
-
         def create_group_assignment(base_ref, user_id):
             """Creates a group assignment from the provided ref."""
-
             ref = copy.deepcopy(base_ref)
 
             ref['user_id'] = user_id
@@ -682,7 +684,6 @@ class Manager(manager.Manager):
         specified, hence avoiding retrieving a huge list.
 
         """
-
         def list_role_assignments_for_actor(
                 role_id, inherited, user_id=None,
                 group_ids=None, project_id=None, domain_id=None):
@@ -711,7 +712,6 @@ class Manager(manager.Manager):
                       response are included.
 
             """
-
             # List direct project role assignments
             project_ids = [project_id] if project_id else None
 
@@ -758,7 +758,7 @@ class Manager(manager.Manager):
             return non_inherited_refs + inherited_refs
 
         # If filtering by group or inherited domain assignment the list is
-        # guranteed to be empty
+        # guaranteed to be empty
         if group_id or (domain_id and inherited):
             return []
 
@@ -827,7 +827,6 @@ class Manager(manager.Manager):
         inherited roles retrieval, inherited role assignments will be ignored.
 
         """
-
         if not CONF.os_inherit.enabled:
             if inherited:
                 return []
@@ -981,7 +980,6 @@ class AssignmentDriverV8(object):
                             domain_id=None, project_id=None,
                             inherited_to_projects=False):
         """Lists role ids for assignments/grants."""
-
         raise exception.NotImplemented()  # pragma: no cover
 
     @abc.abstractmethod
@@ -1139,7 +1137,6 @@ class AssignmentDriverV8(object):
     @abc.abstractmethod
     def delete_role_assignments(self, role_id):
         """Deletes all assignments for a role."""
-
         raise exception.NotImplemented()  # pragma: no cover
 
     @abc.abstractmethod
@@ -1208,7 +1205,7 @@ class RoleManager(manager.Manager):
     def delete_role(self, role_id, initiator=None):
         try:
             self.assignment_api.delete_tokens_for_role_assignments(role_id)
-        except exception.NotImplemented:
+        except exception.NotImplemented:  # nosec
             # FIXME(morganfainberg): Not all backends (ldap) implement
             # `list_role_assignments_for_role` which would have previously
             # caused a NotImplmented error to be raised when called through

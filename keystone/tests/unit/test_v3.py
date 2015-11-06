@@ -39,6 +39,7 @@ TIME_FORMAT = unit.TIME_FORMAT
 
 class AuthTestMixin(object):
     """To hold auth building helper functions."""
+
     def build_auth_scope(self, project_id=None, project_name=None,
                          project_domain_id=None, project_domain_name=None,
                          domain_id=None, domain_name=None, trust_id=None,
@@ -147,9 +148,7 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
             pass
 
     def setUp(self, app_conf='keystone'):
-        """Setup for v3 Restful Test Cases.
-
-        """
+        """Setup for v3 Restful Test Cases."""
         new_paste_file = self.generate_paste_config()
         self.addCleanup(self.remove_generated_paste_config)
         if new_paste_file:
@@ -408,7 +407,6 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
 
     def get_requested_token(self, auth):
         """Request the specific token we want."""
-
         r = self.v3_create_token(auth)
         return r.headers.get('X-Subject-Token')
 
@@ -1287,6 +1285,7 @@ class JsonHomeTestMixin(object):
     data must be in the response.
 
     """
+
     def test_get_json_home(self):
         resp = self.get('/', convert=False,
                         headers={'Accept': 'application/json-home'})
@@ -1309,7 +1308,6 @@ class AssignmentTestMixin(object):
         Available filters are: domain_id, project_id, user_id, group_id,
         role_id and inherited_to_projects.
         """
-
         query_params = '?effective' if effective else ''
 
         for k, v in filters.items():
@@ -1334,7 +1332,6 @@ class AssignmentTestMixin(object):
         Provided attributes are expected to contain: domain_id or project_id,
         user_id or group_id, role_id and, optionally, inherited_to_projects.
         """
-
         if attribs.get('domain_id'):
             link = '/domains/' + attribs['domain_id']
         else:
@@ -1358,7 +1355,6 @@ class AssignmentTestMixin(object):
         Provided attributes are expected to contain: domain_id or project_id,
         user_id or group_id, role_id and, optionally, inherited_to_projects.
         """
-
         entity = {'links': {'assignment': (
             link or self.build_role_assignment_link(**attribs))}}
 

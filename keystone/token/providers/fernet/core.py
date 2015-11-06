@@ -237,7 +237,7 @@ class Provider(common.BaseProvider):
         :param token: a string describing the token to validate
         :returns: the token data
         :raises keystone.exception.TokenNotFound: if token format version isn't
-                                                 supported
+            supported
 
         """
         try:
@@ -248,13 +248,14 @@ class Provider(common.BaseProvider):
             raise exception.TokenNotFound(e)
 
         token_dict = None
-        trust_ref = None
         if federated_info:
             token_dict = self._rebuild_federated_info(federated_info, user_id)
             if project_id or domain_id:
                 self._rebuild_federated_token_roles(token_dict, federated_info,
                                                     user_id, project_id,
                                                     domain_id)
+
+        trust_ref = None
         if trust_id:
             trust_ref = self.trust_api.get_trust(trust_id)
 
@@ -274,7 +275,7 @@ class Provider(common.BaseProvider):
 
         :param token_data: token information
         :type token_data: dict
-        :raises keystone.exception.NotImplemented: when called
+
         """
         return self.token_formatter.create_token(
             token_data['token']['user']['id'],
@@ -292,5 +293,6 @@ class Provider(common.BaseProvider):
         """Return if the token provider supports bind authentication methods.
 
         :returns: False
+
         """
         return False

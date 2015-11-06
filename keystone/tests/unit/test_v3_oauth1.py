@@ -801,7 +801,6 @@ class OAuthNotificationTests(OAuth1Tests,
         notifications for request token creation, and access token
         creation/deletion are emitted.
         """
-
         consumer = self._create_single_consumer()
         consumer_id = consumer['id']
         consumer_secret = consumer['secret']
@@ -874,7 +873,7 @@ class OAuthNotificationTests(OAuth1Tests,
 class OAuthCADFNotificationTests(OAuthNotificationTests):
 
     def setUp(self):
-        """Repeat the tests for CADF notifications """
+        """Repeat the tests for CADF notifications."""
         super(OAuthCADFNotificationTests, self).setUp()
         self.config_fixture.config(notification_format='cadf')
 

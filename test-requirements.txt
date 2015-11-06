@@ -7,6 +7,8 @@ hacking<0.11,>=0.10.0
 -e git+https://github.com/openstack/oslosphinx.git#egg=oslosphinx
 -e git+https://github.com/openstack/oslotest.git#egg=oslotest
 
+pep257==0.7.0 # MIT License
+flake8-docstrings==0.2.1.post1
 bashate>=0.2 # Apache-2.0
 
 # computes code coverage percentages

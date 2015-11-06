@@ -136,6 +136,7 @@ class AssignmentTestHelperMixin(object):
         # 'inherited_to_projects' options to list_role_assignments.}
 
     """
+
     def _handle_project_spec(self, test_data, domain_id, project_spec,
                              parent_id=None):
         """Handle the creation of a project or hierarchy of projects.
@@ -197,7 +198,6 @@ class AssignmentTestHelperMixin(object):
 
         def _create_entity_in_domain(entity_type, domain_id):
             """Create a user or group entity in the domain."""
-
             new_entity = {'name': uuid.uuid4().hex, 'domain_id': domain_id}
             if entity_type == 'users':
                 new_entity = self.identity_api.create_user(new_entity)
@@ -288,7 +288,6 @@ class AssignmentTestHelperMixin(object):
 
     def create_group_memberships(self, group_pattern, test_data):
         """Create the group memberships specified in the test plan."""
-
         for group_spec in group_pattern:
             # Each membership specification is a dict of the form:
             #
@@ -304,7 +303,6 @@ class AssignmentTestHelperMixin(object):
 
     def create_assignments(self, assignment_pattern, test_data):
         """Create the assignments specified in the test plan."""
-
         # First store how many assignments are already in the system,
         # so during the tests we can check the number of new assignments
         # created.
@@ -335,9 +333,8 @@ class AssignmentTestHelperMixin(object):
             self.assignment_api.create_grant(**args)
         return test_data
 
-    def execute_assignment_tests(self, test_plan, test_data):
+    def execute_assignment_cases(self, test_plan, test_data):
         """Execute the test plan, based on the created test_data."""
-
         def check_results(expected, actual, param_arg_count):
             if param_arg_count == 0:
                 # It was an unfiltered call, so default fixture assignments
@@ -392,7 +389,7 @@ class AssignmentTestHelperMixin(object):
             results = self.assignment_api.list_role_assignments(**args)
             check_results(test['results'], results, len(args))
 
-    def execute_assignment_test_plan(self, test_plan):
+    def execute_assignment_plan(self, test_plan):
         """Create entities, assignments and execute the test plan.
 
         The standard method to call to create entities and assignments and
@@ -408,7 +405,7 @@ class AssignmentTestHelperMixin(object):
         if 'assignments' in test_plan:
             test_data = self.create_assignments(test_plan['assignments'],
                                                 test_data)
-        self.execute_assignment_tests(test_plan, test_data)
+        self.execute_assignment_cases(test_plan, test_data)
         return test_data
 
 
@@ -885,7 +882,6 @@ class IdentityTests(AssignmentTestHelperMixin):
 
     def test_list_role_assignments_unfiltered(self):
         """Test unfiltered listing of role assignments."""
-
         test_plan = {
             # Create a domain, with a user, group & project
             'entities': {'domains': {'users': 1, 'groups': 1, 'projects': 1},
@@ -904,11 +900,10 @@ class IdentityTests(AssignmentTestHelperMixin):
                              {'group': 0, 'role': 2, 'project': 0}]}
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_list_role_assignments_filtered_by_role(self):
         """Test listing of role assignments filtered by role ID."""
-
         test_plan = {
             # Create a user, group & project in the default domain
             'entities': {'domains': {'id': DEFAULT_DOMAIN_ID,
@@ -927,7 +922,7 @@ class IdentityTests(AssignmentTestHelperMixin):
                              {'group': 0, 'role': 2, 'project': 0}]}
             ]
         }
-        test_data = self.execute_assignment_test_plan(test_plan)
+        test_data = self.execute_assignment_plan(test_plan)
 
         # Also test that list_role_assignments_for_role() gives the same answer
         assignment_list = self.assignment_api.list_role_assignments_for_role(
@@ -960,7 +955,7 @@ class IdentityTests(AssignmentTestHelperMixin):
                  'results': [{'group': 0, 'role': 0, 'project': 0}]}
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_list_role_assignments_bad_role(self):
         assignment_list = self.assignment_api.list_role_assignments_for_role(
@@ -1647,7 +1642,6 @@ class IdentityTests(AssignmentTestHelperMixin):
 
     def test_grant_crud_throws_exception_if_invalid_role(self):
         """Ensure RoleNotFound thrown if role does not exist."""
-
         def assert_role_not_found_exception(f, **kwargs):
             self.assertRaises(exception.RoleNotFound, f,
                               role_id=uuid.uuid4().hex, **kwargs)
@@ -1990,7 +1984,6 @@ class IdentityTests(AssignmentTestHelperMixin):
 
     def test_list_role_assignment_by_domain(self):
         """Test listing of role assignment filtered by domain."""
-
         test_plan = {
             # A domain with 3 users, 1 group, a spoiler domain and 2 roles.
             'entities': {'domains': [{'users': 3, 'groups': 1}, 1],
@@ -2016,11 +2009,10 @@ class IdentityTests(AssignmentTestHelperMixin):
                  'results': []},
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_list_role_assignment_by_user_with_domain_group_roles(self):
         """Test listing assignments by user, with group roles on a domain."""
-
         test_plan = {
             # A domain with 3 users, 3 groups, a spoiler domain
             # plus 3 roles.
@@ -2062,7 +2054,7 @@ class IdentityTests(AssignmentTestHelperMixin):
                  'results': []},
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_delete_domain_with_user_group_project_links(self):
         # TODO(chungg):add test case once expected behaviour defined
@@ -2364,7 +2356,7 @@ class IdentityTests(AssignmentTestHelperMixin):
                    'domain_id': DEFAULT_DOMAIN_ID}
         self.resource_api.create_project(project['id'], project)
         project_ref = self.resource_api.get_project(project['id'])
-        self.assertEqual(True, project_ref['enabled'])
+        self.assertTrue(project_ref['enabled'])
 
         # Strings are not valid boolean values
         project['enabled'] = "false"
@@ -2649,7 +2641,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         project['enabled'] = False
         self.resource_api.update_project(project['id'], project)
 
-        # Successfuly delete the project
+        # Successfully delete the project
         self.resource_api.delete_project(project['id'])
 
     @unit.skip_if_no_multiple_domains_support
@@ -2839,7 +2831,7 @@ class IdentityTests(AssignmentTestHelperMixin):
 
         subtree = self.resource_api.list_projects_in_subtree(project1_id)
 
-        # NOTE(dstanek): If a cyclic refence is detected the code bails
+        # NOTE(dstanek): If a cyclic reference is detected the code bails
         # and returns None instead of falling into the infinite
         # recursion trap.
         self.assertIsNone(subtree)
@@ -2932,7 +2924,7 @@ class IdentityTests(AssignmentTestHelperMixin):
                 'domain_id': DEFAULT_DOMAIN_ID}
         user = self.identity_api.create_user(user)
         user_ref = self.identity_api.get_user(user['id'])
-        self.assertEqual(True, user_ref['enabled'])
+        self.assertTrue(user_ref['enabled'])
 
         user['enabled'] = False
         self.identity_api.update_user(user['id'], user)
@@ -2943,7 +2935,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         del user['enabled']
         self.identity_api.update_user(user['id'], user)
         user_ref = self.identity_api.get_user(user['id'])
-        self.assertEqual(False, user_ref['enabled'])
+        self.assertFalse(user_ref['enabled'])
 
         user['enabled'] = True
         self.identity_api.update_user(user['id'], user)
@@ -2953,19 +2945,19 @@ class IdentityTests(AssignmentTestHelperMixin):
         del user['enabled']
         self.identity_api.update_user(user['id'], user)
         user_ref = self.identity_api.get_user(user['id'])
-        self.assertEqual(True, user_ref['enabled'])
+        self.assertTrue(user_ref['enabled'])
 
         # Integers are valid Python's booleans. Explicitly test it.
         user['enabled'] = 0
         self.identity_api.update_user(user['id'], user)
         user_ref = self.identity_api.get_user(user['id'])
-        self.assertEqual(False, user_ref['enabled'])
+        self.assertFalse(user_ref['enabled'])
 
         # Any integers other than 0 are interpreted as True
         user['enabled'] = -42
         self.identity_api.update_user(user['id'], user)
         user_ref = self.identity_api.get_user(user['id'])
-        self.assertEqual(True, user_ref['enabled'])
+        self.assertTrue(user_ref['enabled'])
 
     def test_update_user_name(self):
         user = {'name': uuid.uuid4().hex,
@@ -2995,7 +2987,7 @@ class IdentityTests(AssignmentTestHelperMixin):
                 'domain_id': DEFAULT_DOMAIN_ID}
         user = self.identity_api.create_user(user)
         user_ref = self.identity_api.get_user(user['id'])
-        self.assertEqual(True, user_ref['enabled'])
+        self.assertTrue(user_ref['enabled'])
 
         # Strings are not valid boolean values
         user['enabled'] = "false"
@@ -3009,7 +3001,7 @@ class IdentityTests(AssignmentTestHelperMixin):
                   'domain_id': DEFAULT_DOMAIN_ID}
         self.resource_api.create_project('fake1', tenant)
         tenant_ref = self.resource_api.get_project('fake1')
-        self.assertEqual(True, tenant_ref['enabled'])
+        self.assertTrue(tenant_ref['enabled'])
 
         tenant['enabled'] = False
         self.resource_api.update_project('fake1', tenant)
@@ -3020,7 +3012,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         del tenant['enabled']
         self.resource_api.update_project('fake1', tenant)
         tenant_ref = self.resource_api.get_project('fake1')
-        self.assertEqual(False, tenant_ref['enabled'])
+        self.assertFalse(tenant_ref['enabled'])
 
         tenant['enabled'] = True
         self.resource_api.update_project('fake1', tenant)
@@ -3030,7 +3022,7 @@ class IdentityTests(AssignmentTestHelperMixin):
         del tenant['enabled']
         self.resource_api.update_project('fake1', tenant)
         tenant_ref = self.resource_api.get_project('fake1')
-        self.assertEqual(True, tenant_ref['enabled'])
+        self.assertTrue(tenant_ref['enabled'])
 
     def test_add_user_to_group(self):
         domain = self._get_domain_fixture()
@@ -4769,7 +4761,7 @@ class TokenTests(object):
 
     def _test_predictable_revoked_pki_token_id(self, hash_fn):
         token_id = self._create_token_id()
-        token_id_hash = hash_fn(token_id).hexdigest()
+        token_id_hash = hash_fn(token_id.encode('utf-8')).hexdigest()
         token = {'user': {'id': uuid.uuid4().hex}}
 
         self.token_provider_api._persistence.create_token(token_id, token)
@@ -5706,7 +5698,6 @@ class CatalogTests(object):
 
     def test_get_catalog_endpoint_disabled(self):
         """Get back only enabled endpoints when get the v2 catalog."""
-
         service_ref, enabled_endpoint_ref, dummy_disabled_endpoint_ref = (
             self._create_endpoints())
 
@@ -5725,7 +5716,6 @@ class CatalogTests(object):
 
     def test_get_v3_catalog_endpoint_disabled(self):
         """Get back only enabled endpoints when get the v3 catalog."""
-
         enabled_endpoint_ref = self._create_endpoints()[1]
 
         user_id = uuid.uuid4().hex
@@ -5885,7 +5875,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
             ]
         }
         self.config_fixture.config(group='os_inherit', enabled=True)
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_inherited_role_assignments_excluded_if_os_inherit_false(self):
         test_plan = {
@@ -5916,7 +5906,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
             ]
         }
         self.config_fixture.config(group='os_inherit', enabled=False)
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def _test_crud_inherited_and_direct_assignment(self, **kwargs):
         """Tests inherited and direct assignments for the actor and target
@@ -5927,12 +5917,11 @@ class InheritanceTests(AssignmentTestHelperMixin):
         ('project_id' or 'domain_id'), respectively.
 
         """
-
         # Create a new role to avoid assignments loaded from default fixtures
         role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
         role = self.role_api.create_role(role['id'], role)
 
-        # Define the common assigment entity
+        # Define the common assignment entity
         assignment_entity = {'role_id': role['id']}
         assignment_entity.update(kwargs)
 
@@ -6066,7 +6055,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
 
         # TODO(henry-nash): The test above uses get_roles_for_user_and_project
         # and get_roles_for_user_and_domain, which will, in a subsequent patch,
-        # be re-implemeted to simply call list_role_assignments (see blueprint
+        # be re-implemented to simply call list_role_assignments (see blueprint
         # remove-role-metadata).
         #
         # The test plan below therefore mirrors this test, to ensure that
@@ -6098,7 +6087,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
                  'results': [{'user': 0, 'role': 1, 'domain': 0}]},
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_inherited_role_grants_for_group(self):
         """Test inherited group roles.
@@ -6184,7 +6173,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
         self.assertIn(role_list[3]['id'], combined_list)
 
         # TODO(henry-nash): The test above uses get_roles_for_user_and_project
-        # which will, in a subsequent patch, be re-implemeted to simply call
+        # which will, in a subsequent patch, be re-implemented to simply call
         # list_role_assignments (see blueprint remove-role-metadata).
         #
         # The test plan below therefore mirrors this test, to ensure that
@@ -6217,7 +6206,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
                               'indirect': {'domain': 0, 'group': 1}}]}
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_list_projects_for_user_with_inherited_grants(self):
         """Test inherited user roles.
@@ -6259,7 +6248,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
         self.assertEqual(3, len(user_projects))
 
         # TODO(henry-nash): The test above uses list_projects_for_user
-        # which may, in a subsequent patch, be re-implemeted to call
+        # which may, in a subsequent patch, be re-implemented to call
         # list_role_assignments and then report only the distinct projects.
         #
         # The test plan below therefore mirrors this test, to ensure that
@@ -6287,7 +6276,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
                               'indirect': {'domain': 1}}]}
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_list_projects_for_user_with_inherited_user_project_grants(self):
         """Test inherited role assignments for users on nested projects.
@@ -6350,7 +6339,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
         self.assertIn(root_project, user_projects)
 
         # TODO(henry-nash): The test above uses list_projects_for_user
-        # which may, in a subsequent patch, be re-implemeted to call
+        # which may, in a subsequent patch, be re-implemented to call
         # list_role_assignments and then report only the distinct projects.
         #
         # The test plan below therefore mirrors this test, to ensure that
@@ -6387,10 +6376,10 @@ class InheritanceTests(AssignmentTestHelperMixin):
             ]
         }
         self.config_fixture.config(group='os_inherit', enabled=True)
-        test_data = self.execute_assignment_test_plan(test_plan)
+        test_data = self.execute_assignment_plan(test_plan)
         self.config_fixture.config(group='os_inherit', enabled=False)
         # Pass the existing test data in to allow execution of 2nd test plan
-        self.execute_assignment_tests(
+        self.execute_assignment_cases(
             test_plan_with_os_inherit_disabled, test_data)
 
     def test_list_projects_for_user_with_inherited_group_grants(self):
@@ -6458,7 +6447,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
         self.assertEqual(5, len(user_projects))
 
         # TODO(henry-nash): The test above uses list_projects_for_user
-        # which may, in a subsequent patch, be re-implemeted to call
+        # which may, in a subsequent patch, be re-implemented to call
         # list_role_assignments and then report only the distinct projects.
         #
         # The test plan below therefore mirrors this test, to ensure that
@@ -6483,7 +6472,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
             'tests': [
                 # List all effective assignments for user[0]
                 # Should get back both direct roles plus roles on both projects
-                # from each domain. Duplicates should not be fitered out.
+                # from each domain. Duplicates should not be filtered out.
                 {'params': {'user': 0, 'effective': True},
                  'results': [{'user': 0, 'role': 0, 'project': 3},
                              {'user': 0, 'role': 0, 'project': 0},
@@ -6497,7 +6486,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
                               'indirect': {'domain': 2}}]}
             ]
         }
-        self.execute_assignment_test_plan(test_plan)
+        self.execute_assignment_plan(test_plan)
 
     def test_list_projects_for_user_with_inherited_group_project_grants(self):
         """Test inherited role assignments for groups on nested projects.
@@ -6563,7 +6552,7 @@ class InheritanceTests(AssignmentTestHelperMixin):
         self.assertIn(root_project, user_projects)
 
         # TODO(henry-nash): The test above uses list_projects_for_user
-        # which may, in a subsequent patch, be re-implemeted to call
+        # which may, in a subsequent patch, be re-implemented to call
         # list_role_assignments and then report only the distinct projects.
         #
         # The test plan below therefore mirrors this test, to ensure that
@@ -6603,10 +6592,10 @@ class InheritanceTests(AssignmentTestHelperMixin):
             ]
         }
         self.config_fixture.config(group='os_inherit', enabled=True)
-        test_data = self.execute_assignment_test_plan(test_plan)
+        test_data = self.execute_assignment_plan(test_plan)
         self.config_fixture.config(group='os_inherit', enabled=False)
         # Pass the existing test data in to allow execution of 2nd test plan
-        self.execute_assignment_tests(
+        self.execute_assignment_cases(
             test_plan_with_os_inherit_disabled, test_data)
 
 
@@ -6700,7 +6689,6 @@ class FilterTests(filtering.FilterTests):
           name, both restrictions have been enforced on what is returned.
 
         """
-
         number_of_groups = 10
         group_name_data = {
             # entity index: name for entity
@@ -6800,7 +6788,6 @@ class LimitTests(filtering.FilterTests):
 
     def setUp(self):
         """Setup for Limit Test Cases."""
-
         self.domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
         self.resource_api.create_domain(self.domain1['id'], self.domain1)
         self.addCleanup(self.clean_up_domain)
@@ -6817,7 +6804,6 @@ class LimitTests(filtering.FilterTests):
 
     def clean_up_domain(self):
         """Clean up domain test data from Limit Test Cases."""
-
         self.domain1['enabled'] = False
         self.resource_api.update_domain(self.domain1['id'], self.domain1)
         self.resource_api.delete_domain(self.domain1['id'])

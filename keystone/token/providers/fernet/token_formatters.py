@@ -119,7 +119,7 @@ class TokenFormatter(object):
         # Restore padding on token before decoding it
         fernet_token = TokenFormatter.restore_padding(fernet_token)
 
-        # fernet tokens are base64 encoded, so we need to unpack them first
+        # Fernet tokens are base64 encoded, so we need to unpack them first
         token_bytes = base64.urlsafe_b64decode(fernet_token)
 
         # slice into the byte array to get just the timestamp
@@ -303,7 +303,7 @@ class BasePayload(object):
 
         """
         # TODO(lbragstad): Wrap this in an exception. Not sure what the case
-        # would be where we couldn't handle what we've been given but incase
+        # would be where we couldn't handle what we've been given but in case
         # the integrity of the token has been compromised.
         uuid_obj = uuid.UUID(uuid_string)
         return uuid_obj.bytes
@@ -317,7 +317,7 @@ class BasePayload(object):
 
         """
         # TODO(lbragstad): Wrap this in an exception. Not sure what the case
-        # would be where we couldn't handle what we've been given but incase
+        # would be where we couldn't handle what we've been given but in case
         # the integrity of the token has been compromised.
         uuid_obj = uuid.UUID(bytes=uuid_byte_string)
         return uuid_obj.hex
@@ -596,7 +596,6 @@ class FederatedUnscopedPayload(BasePayload):
         :returns: the payload of a federated token
 
         """
-
         b_user_id = cls.attempt_convert_uuid_hex_to_bytes(user_id)
         methods = auth_plugins.convert_method_list_to_integer(methods)
         b_group_ids = list(map(cls.pack_group_id,
@@ -622,7 +621,6 @@ class FederatedUnscopedPayload(BasePayload):
                  federated domain ID
 
         """
-
         (is_stored_as_bytes, user_id) = payload[0]
         if is_stored_as_bytes:
             user_id = cls.attempt_convert_uuid_bytes_to_hex(user_id)

@@ -200,7 +200,7 @@ class TestValidate(unit.TestCase):
     def test_validate_v3_token_validation_error_exc(self):
         # When the token format isn't recognized, TokenNotFound is raised.
 
-        # A uuid string isn't a valid fernet token.
+        # A uuid string isn't a valid Fernet token.
         token_id = uuid.uuid4().hex
         self.assertRaises(exception.TokenNotFound,
                           self.token_provider_api.validate_v3_token, token_id)
@@ -232,7 +232,7 @@ class TestTokenFormatter(unit.TestCase):
         payload = (first_value, second_value)
         msgpack_payload = msgpack.packb(payload)
 
-        # NOTE(lbragstad): This method perserves the way that keystone used to
+        # NOTE(lbragstad): This method preserves the way that keystone used to
         # percent encode the tokens, prior to bug #1491926.
         def legacy_pack(payload):
             tf = token_formatters.TokenFormatter()
@@ -245,7 +245,7 @@ class TestTokenFormatter(unit.TestCase):
             # keystone did in Kilo.
             percent_encoded_payload = urllib.parse.quote(encrypted_payload)
 
-            # ensure that the padding was actaully percent encoded
+            # ensure that the padding was actually percent encoded
             self.assertTrue(percent_encoded_payload.endswith('%3D'))
             return percent_encoded_payload
 

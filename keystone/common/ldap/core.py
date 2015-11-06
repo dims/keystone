@@ -110,14 +110,15 @@ def py2ldap(val):
 
 def enabled2py(val):
     """Similar to ldap2py, only useful for the enabled attribute."""
-
     try:
         return LDAP_VALUES[val]
-    except KeyError:
+    except KeyError:  # nosec
+        # It wasn't a boolean value, will try as an int instead.
         pass
     try:
         return int(val)
-    except ValueError:
+    except ValueError:  # nosec
+        # It wasn't an int either, will try as utf8 instead.
         pass
     return utf8_decode(val)
 
@@ -239,7 +240,6 @@ def is_ava_value_equal(attribute_type, val1, val2):
     that function apply here.
 
     """
-
     return prep_case_insensitive(val1) == prep_case_insensitive(val2)
 
 
@@ -259,7 +259,6 @@ def is_rdn_equal(rdn1, rdn2):
     limitations of that function apply here.
 
     """
-
     if len(rdn1) != len(rdn2):
         return False
 
@@ -292,7 +291,6 @@ def is_dn_equal(dn1, dn2):
     :param dn2: Either a string DN or a DN parsed by ldap.dn.str2dn.
 
     """
-
     if not isinstance(dn1, list):
         dn1 = ldap.dn.str2dn(utf8_encode(dn1))
     if not isinstance(dn2, list):
@@ -314,7 +312,6 @@ def dn_startswith(descendant_dn, dn):
     :param dn: Either a string DN or a DN parsed by ldap.dn.str2dn.
 
     """
-
     if not isinstance(descendant_dn, list):
         descendant_dn = ldap.dn.str2dn(utf8_encode(descendant_dn))
     if not isinstance(dn, list):
@@ -419,6 +416,7 @@ class LDAPHandler(object):
     derived classes.
 
     """
+
     @abc.abstractmethod
     def __init__(self, conn=None):
         self.conn = conn
@@ -625,6 +623,7 @@ def _common_ldap_initialization(url, use_tls=False, tls_cacertfile=None,
 
 class MsgId(list):
     """Wrapper class to hold connection and msgid."""
+
     pass
 
 
@@ -665,6 +664,7 @@ class PooledLDAPHandler(LDAPHandler):
     the methods in this class.
 
     """
+
     # Added here to allow override for testing
     Connector = ldappool.StateConnector
     auth_pool_prefix = 'auth_pool_'
@@ -815,7 +815,6 @@ class PooledLDAPHandler(LDAPHandler):
         which requested msgId and used it in result3 exits.
 
         """
-
         conn, msg_id = msgid
         return conn.result3(msg_id, all, timeout)
 
@@ -1354,7 +1353,8 @@ class BaseLdap(object):
                     continue
 
                 v = lower_res[map_attr.lower()]
-            except KeyError:
+            except KeyError:  # nosec
+                # Didn't find the attr, so don't add it.
                 pass
             else:
                 try:
@@ -1383,7 +1383,8 @@ class BaseLdap(object):
         if values.get('name') is not None:
             try:
                 self.get_by_name(values['name'])
-            except exception.NotFound:
+            except exception.NotFound:  # nosec
+                # Didn't find it so it's unique, good.
                 pass
             else:
                 raise exception.Conflict(type=self.options_name,
@@ -1393,7 +1394,8 @@ class BaseLdap(object):
         if values.get('id') is not None:
             try:
                 self.get(values['id'])
-            except exception.NotFound:
+            except exception.NotFound:  # nosec
+                # Didn't find it, so it's unique, good.
                 pass
             else:
                 raise exception.Conflict(type=self.options_name,
@@ -1840,7 +1842,8 @@ class EnabledEmuMixIn(BaseLdap):
         with self.get_connection() as conn:
             try:
                 conn.modify_s(self.enabled_emulation_dn, modlist)
-            except (ldap.NO_SUCH_OBJECT, ldap.NO_SUCH_ATTRIBUTE):
+            except (ldap.NO_SUCH_OBJECT, ldap.NO_SUCH_ATTRIBUTE):  # nosec
+                # It's already gone, good.
                 pass
 
     def create(self, values):
@@ -1905,6 +1908,7 @@ class ProjectLdapStructureMixin(object):
     This is shared between the resource and assignment LDAP backends.
 
     """
+
     DEFAULT_OU = 'ou=Groups'
     DEFAULT_STRUCTURAL_CLASSES = []
     DEFAULT_OBJECTCLASS = 'groupOfNames'

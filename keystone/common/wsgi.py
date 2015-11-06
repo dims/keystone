@@ -115,7 +115,6 @@ def best_match_language(req):
     """Determines the best available locale from the Accept-Language
     HTTP header passed in the request.
     """
-
     if not req.accept_language:
         return None
     return req.accept_language.best_match(
@@ -305,7 +304,6 @@ class Application(BaseApplication):
             does not have the admin role
 
         """
-
         if not context['is_admin']:
             user_token_ref = utils.get_token_ref(context)
 
@@ -400,32 +398,10 @@ class Middleware(Application):
     """
 
     @classmethod
-    def factory(cls, global_config, **local_config):
-        """Used for paste app factories in paste.deploy config files.
-
-        Any local configuration (that is, values under the [filter:APPNAME]
-        section of the paste config) will be passed into the `__init__` method
-        as kwargs.
-
-        A hypothetical configuration would look like:
-
-            [filter:analytics]
-            redis_host = 127.0.0.1
-            paste.filter_factory = keystone.analytics:Analytics.factory
-
-        which would result in a call to the `Analytics` class as
-
-            import keystone.analytics
-            keystone.analytics.Analytics(app, redis_host='127.0.0.1')
-
-        You could of course re-implement the `factory` method in subclasses,
-        but using the kwarg passing it shouldn't be necessary.
-
-        """
+    def factory(cls, global_config):
+        """Used for paste app factories in paste.deploy config files."""
         def _factory(app):
-            conf = global_config.copy()
-            conf.update(local_config)
-            return cls(app, **local_config)
+            return cls(app)
         return _factory
 
     def __init__(self, application):
@@ -601,6 +577,7 @@ class ExtensionRouter(Router):
 
     Expects to be subclassed.
     """
+
     def __init__(self, application, mapper=None):
         if mapper is None:
             mapper = routes.Mapper()
@@ -789,7 +766,6 @@ def render_response(body=None, status=None, headers=None, method=None):
 
 def render_exception(error, context=None, request=None, user_locale=None):
     """Forms a WSGI response based on the current error."""
-
     error_message = error.args[0]
     message = oslo_i18n.translate(error_message, desired_locale=user_locale)
     if message is error_message:

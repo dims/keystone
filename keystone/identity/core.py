@@ -70,7 +70,8 @@ def filter_user(user_ref):
         try:
             user_ref['extra'].pop('password', None)
             user_ref['extra'].pop('tenants', None)
-        except KeyError:
+        except KeyError:  # nosec
+            # ok to not have extra in the user_ref.
             pass
     return user_ref
 
@@ -92,6 +93,7 @@ class DomainConfigs(dict):
     the identity manager and driver can use.
 
     """
+
     configured = False
     driver = None
     _any_sql = False
@@ -101,34 +103,22 @@ class DomainConfigs(dict):
                                    domain_config['cfg'].identity.driver,
                                    domain_config['cfg'])
 
-    def _assert_no_more_than_one_sql_driver(self, domain_id, new_config,
-                                            config_file=None):
-        """Ensure there is no more than one sql driver.
-
-        Check to see if the addition of the driver in this new config
-        would cause there to now be more than one sql driver.
-
-        If we are loading from configuration files, the config_file will hold
-        the name of the file we have just loaded.
-
-        """
-        if (new_config['driver'].is_sql and
-                (self.driver.is_sql or self._any_sql)):
-            # The addition of this driver would cause us to have more than
-            # one sql driver, so raise an exception.
-
-            # TODO(henry-nash): This method is only used in the file-based
-            # case, so has no need to worry about the database/API case. The
-            # code that overrides config_file below is therefore never used
-            # and should be removed, and this method perhaps moved inside
-            # _load_config_from_file(). This is raised as bug #1466772.
-
-            if not config_file:
-                config_file = _('Database at /domains/%s/config') % domain_id
-            raise exception.MultipleSQLDriversInConfig(source=config_file)
-        self._any_sql = self._any_sql or new_config['driver'].is_sql
-
     def _load_config_from_file(self, resource_api, file_list, domain_name):
+
+        def _assert_no_more_than_one_sql_driver(domain_id, new_config,
+                                                config_file):
+            """Ensure there is no more than one sql driver.
+
+            Check to see if the addition of the driver in this new config
+            would cause there to be more than one sql driver.
+
+            """
+            if (new_config['driver'].is_sql and
+                    (self.driver.is_sql or self._any_sql)):
+                # The addition of this driver would cause us to have more than
+                # one sql driver, so raise an exception.
+                raise exception.MultipleSQLDriversInConfig(source=config_file)
+            self._any_sql = self._any_sql or new_config['driver'].is_sql
 
         try:
             domain_ref = resource_api.get_domain_by_name(domain_name)
@@ -149,9 +139,9 @@ class DomainConfigs(dict):
         domain_config['cfg'](args=[], project='keystone',
                              default_config_files=file_list)
         domain_config['driver'] = self._load_driver(domain_config)
-        self._assert_no_more_than_one_sql_driver(domain_ref['id'],
-                                                 domain_config,
-                                                 config_file=file_list)
+        _assert_no_more_than_one_sql_driver(domain_ref['id'],
+                                            domain_config,
+                                            file_list)
         self[domain_ref['id']] = domain_config
 
     def _setup_domain_drivers_from_files(self, standard_driver, resource_api):
@@ -404,7 +394,7 @@ class DomainConfigs(dict):
             # specific driver for this domain.
             try:
                 del self[domain_id]
-            except KeyError:
+            except KeyError:  # nosec
                 # Allow this error in case we are unlucky and in a
                 # multi-threaded situation, two threads happen to be running
                 # in lock step.
@@ -436,7 +426,6 @@ def domains_configured(f):
 
 def exception_translated(exception_type):
     """Wraps API calls to map to correct exception."""
-
     def _exception_translated(f):
         @functools.wraps(f)
         def wrapper(self, *args, **kwargs):

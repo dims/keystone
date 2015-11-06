@@ -206,13 +206,13 @@ class Manager(object):
     This class is a proxy class to the token_provider_api's persistence
     manager.
     """
+
     def __init__(self):
         # NOTE(morganfainberg): __init__ is required for dependency processing.
         super(Manager, self).__init__()
 
     def __getattr__(self, item):
         """Forward calls to the `token_provider_api` persistence manager."""
-
         # NOTE(morganfainberg): Prevent infinite recursion, raise an
         # AttributeError for 'token_provider_api' ensuring that the dep
         # injection doesn't infinitely try and lookup self.token_provider_api
@@ -317,7 +317,8 @@ class TokenDriverV8(object):
         for token in token_list:
             try:
                 self.delete_token(token)
-            except exception.NotFound:
+            except exception.NotFound:  # nosec
+                # The token is already gone, good.
                 pass
         return token_list
 
@@ -354,8 +355,7 @@ class TokenDriverV8(object):
 
     @abc.abstractmethod
     def flush_expired_tokens(self):
-        """Archive or delete tokens that have expired.
-        """
+        """Archive or delete tokens that have expired."""
         raise exception.NotImplemented()  # pragma: no cover
 
 

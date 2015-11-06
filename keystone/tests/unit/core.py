@@ -208,6 +208,22 @@ def skip_if_cache_disabled(*sections):
     return wrapper
 
 
+def skip_if_cache_is_enabled(*sections):
+    def wrapper(f):
+        @functools.wraps(f)
+        def inner(*args, **kwargs):
+            if CONF.cache.enabled:
+                for s in sections:
+                    conf_sec = getattr(CONF, s, None)
+                    if conf_sec is not None:
+                        if getattr(conf_sec, 'caching', True):
+                            raise testcase.TestSkipped('%s caching enabled.' %
+                                                       s)
+            return f(*args, **kwargs)
+        return inner
+    return wrapper
+
+
 def skip_if_no_multiple_domains_support(f):
     """Decorator to skip tests for identity drivers limited to one domain."""
     @functools.wraps(f)
@@ -515,7 +531,6 @@ class TestCase(BaseTestCase):
 
     def load_backends(self):
         """Initializes each manager and assigns them to an attribute."""
-
         # TODO(blk-u): Shouldn't need to clear the registry here, but some
         # tests call load_backends multiple times. These should be fixed to
         # only call load_backends once.
@@ -708,6 +723,7 @@ class TestCase(BaseTestCase):
 
 class SQLDriverOverrides(object):
     """A mixin for consolidating sql-specific test overrides."""
+
     def config_overrides(self):
         super(SQLDriverOverrides, self).config_overrides()
         # SQL specific driver overrides

@@ -34,6 +34,7 @@ import json
 import uuid
 
 from migrate.versioning import api as versioning_api
+import mock
 from oslo_config import cfg
 from oslo_db import exception as db_exception
 from oslo_db.sqlalchemy import migration
@@ -431,7 +432,7 @@ class SqlUpgradeTests(SqlMigrateBase):
         self.assertTrue(self.does_fk_exist('assignment', 'role_id'))
         self.upgrade(62)
         if self.engine.name != 'sqlite':
-            # sqlite does not support FK deletions (or enforcement)
+            # SQLite does not support FK deletions (or enforcement)
             self.assertFalse(self.does_fk_exist('assignment', 'role_id'))
 
     def test_insert_assignment_inherited_pk(self):
@@ -502,7 +503,6 @@ class SqlUpgradeTests(SqlMigrateBase):
 
     def does_pk_exist(self, table, pk_column):
         """Checks whether a column is primary key on a table."""
-
         inspector = reflection.Inspector.from_engine(self.engine)
         pk_columns = inspector.get_pk_constraint(table)['constrained_columns']
 
@@ -542,6 +542,28 @@ class SqlUpgradeTests(SqlMigrateBase):
                                 ['domain_id', 'group', 'option', 'value'])
         self.assertTableColumns(sensitive_table,
                                 ['domain_id', 'group', 'option', 'value'])
+
+    def test_endpoint_policy_upgrade(self):
+        self.assertTableDoesNotExist('policy_association')
+        self.upgrade(81)
+        self.assertTableColumns('policy_association',
+                                ['id', 'policy_id', 'endpoint_id',
+                                 'service_id', 'region_id'])
+
+    @mock.patch.object(migration_helpers, 'get_db_version', return_value=1)
+    def test_endpoint_policy_already_migrated(self, mock_ep):
+
+        # By setting the return value to 1, the migration has already been
+        # run, and there's no need to create the table again
+
+        self.upgrade(81)
+
+        mock_ep.assert_called_once_with(extension='endpoint_policy',
+                                        engine=mock.ANY)
+
+        # It won't exist because we are mocking it, but we can verify
+        # that 081 did not create the table
+        self.assertTableDoesNotExist('policy_association')
 
     def test_fixup_service_name_value_upgrade(self):
         """Update service name data from `extra` to empty string."""
@@ -855,20 +877,14 @@ class VersionTests(SqlMigrateBase):
                              'idp_remote_ids table')
 
     def test_unexpected_extension(self):
-        """The version for an extension that doesn't exist raises ImportError.
-
-        """
-
+        """The version for a non-existent extension raises ImportError."""
         extension_name = uuid.uuid4().hex
         self.assertRaises(ImportError,
                           migration_helpers.get_db_version,
                           extension=extension_name)
 
     def test_unversioned_extension(self):
-        """The version for extensions without migrations raise an exception.
-
-        """
-
+        """The version for extensions without migrations raise an exception."""
         self.assertRaises(exception.MigrationNotProvided,
                           migration_helpers.get_db_version,
                           extension='admin_crud')

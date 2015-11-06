@@ -43,9 +43,7 @@ class ArbitraryException(Exception):
 
 
 def register_callback(operation, resource_type=EXP_RESOURCE_TYPE):
-    """Helper for creating and registering a mock callback.
-
-    """
+    """Helper for creating and registering a mock callback."""
     callback = mock.Mock(__name__='callback',
                          im_class=mock.Mock(__name__='class'))
     notifications.register_event_callback(operation, resource_type, callback)
@@ -177,7 +175,7 @@ class NotificationsTestCase(unit.BaseTestCase):
 
     def test_send_notification(self):
         """Test the private method _send_notification to ensure event_type,
-           payload, and context are built and passed properly.
+        payload, and context are built and passed properly.
         """
         resource = uuid.uuid4().hex
         resource_type = EXP_RESOURCE_TYPE
@@ -1006,7 +1004,6 @@ class CadfNotificationsWrapperTestCase(test_v3.RestfulTestCase):
                 'id': 'openstack:782689dd-f428-4f13-99c7-5c70f94a5ac1'
             }
         """
-
         note = self._notifications[-1]
         event = note['event']
         if project:

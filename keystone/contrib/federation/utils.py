@@ -203,7 +203,8 @@ def get_remote_id_parameter(protocol):
                           group=protocol)
         try:
             remote_id_parameter = CONF[protocol]['remote_id_attribute']
-        except AttributeError:
+        except AttributeError:  # nosec
+            # No remote ID attr, will be logged and use the default instead.
             pass
     if not remote_id_parameter:
         LOG.debug('Cannot find "remote_id_attribute" in configuration '
@@ -215,9 +216,7 @@ def get_remote_id_parameter(protocol):
 
 
 def validate_idp(idp, protocol, assertion):
-    """Validate the IdP providing the assertion is registered for the mapping.
-    """
-
+    """The IdP providing the assertion should be registered for the mapping."""
     remote_id_parameter = get_remote_id_parameter(protocol)
     if not remote_id_parameter or not idp['remote_ids']:
         LOG.debug('Impossible to identify the IdP %s ', idp['id'])
@@ -237,7 +236,7 @@ def validate_idp(idp, protocol, assertion):
 
 
 def validate_groups_in_backend(group_ids, mapping_id, identity_api):
-    """Iterate over group ids and make sure they are present in the backend/
+    """Iterate over group ids and make sure they are present in the backend.
 
     This call is not transactional.
     :param group_ids: IDs of the groups to be checked
@@ -287,7 +286,7 @@ def validate_groups(group_ids, mapping_id, identity_api):
 # backend are minimized.
 def transform_to_group_ids(group_names, mapping_id,
                            identity_api, resource_api):
-    """Transform groups identitified by name/domain to their ids
+    """Transform groups identified by name/domain to their ids
 
     Function accepts list of groups identified by a name and domain giving
     a list of group ids in return.
@@ -325,7 +324,6 @@ def transform_to_group_ids(group_names, mapping_id,
         exist in the backend.
 
     """
-
     def resolve_domain(domain):
         """Return domain id.
 
@@ -362,6 +360,7 @@ def get_assertion_params_from_env(context):
 
 class UserType(object):
     """User mapping type."""
+
     EPHEMERAL = 'ephemeral'
     LOCAL = 'local'
 
@@ -371,6 +370,7 @@ class RuleProcessor(object):
 
     class _EvalType(object):
         """Mapping rule evaluation types."""
+
         ANY_ONE_OF = 'any_one_of'
         NOT_ANY_OF = 'not_any_of'
         BLACKLIST = 'blacklist'
@@ -386,7 +386,6 @@ class RuleProcessor(object):
         :type rules: dict
 
         """
-
         self.rules = rules
 
     def process(self, assertion_data):
@@ -439,7 +438,6 @@ class RuleProcessor(object):
             }
 
         """
-
         # Assertions will come in as string key-value pairs, and will use a
         # semi-colon to indicate multiple values, i.e. groups.
         # This will create a new dictionary where the values are arrays, and
@@ -506,7 +504,6 @@ class RuleProcessor(object):
         :rtype: dict
 
         """
-
         def extract_groups(groups_by_domain):
             for groups in list(groups_by_domain.values()):
                 for group in list({g['name']: g for g in groups}.values()):
@@ -514,7 +511,6 @@ class RuleProcessor(object):
 
         def normalize_user(user):
             """Parse and validate user mapping."""
-
             user_type = user.get('type')
 
             if user_type and user_type not in (UserType.EPHEMERAL,
@@ -602,7 +598,6 @@ class RuleProcessor(object):
             {'user': {'name': 'Bob Thompson', 'email': 'bob@example.org'}}
 
         """
-
         LOG.debug('direct_maps: %s', direct_maps)
         LOG.debug('local: %s', local)
         new = {}
@@ -667,7 +662,6 @@ class RuleProcessor(object):
         :rtype: keystone.contrib.federation.utils.DirectMaps or None
 
         """
-
         direct_maps = DirectMaps()
 
         for requirement in requirements:

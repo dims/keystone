@@ -53,6 +53,7 @@ class CredentialBaseTestCase(test_v3.RestfulTestCase):
 
 class CredentialTestCase(CredentialBaseTestCase):
     """Test credential CRUD."""
+
     def setUp(self):
 
         super(CredentialTestCase, self).setUp()
@@ -245,8 +246,8 @@ class CredentialTestCase(CredentialBaseTestCase):
                             r.result['credential']['id'])
 
     def test_create_ec2_credential_with_missing_project_id(self):
-        """Call ``POST /credentials`` for creating ec2
-           credential with missing project_id.
+        """Call ``POST /credentials`` for creating ec2 credential with missing
+        project_id.
         """
         ref = self.new_credential_ref(user_id=self.user['id'])
         blob = {"access": uuid.uuid4().hex,
@@ -259,8 +260,8 @@ class CredentialTestCase(CredentialBaseTestCase):
             body={'credential': ref}, expected_status=http_client.BAD_REQUEST)
 
     def test_create_ec2_credential_with_invalid_blob(self):
-        """Call ``POST /credentials`` for creating ec2
-           credential with invalid blob.
+        """Call ``POST /credentials`` for creating ec2 credential with invalid
+        blob.
         """
         ref = self.new_credential_ref(user_id=self.user['id'],
                                       project_id=self.project_id)
@@ -284,6 +285,7 @@ class CredentialTestCase(CredentialBaseTestCase):
 
 class TestCredentialTrustScoped(test_v3.RestfulTestCase):
     """Test credential with trust scoped token."""
+
     def setUp(self):
         super(TestCredentialTrustScoped, self).setUp()
 
@@ -356,6 +358,7 @@ class TestCredentialTrustScoped(test_v3.RestfulTestCase):
 
 class TestCredentialEc2(CredentialBaseTestCase):
     """Test v3 credential compatibility with ec2tokens."""
+
     def setUp(self):
         super(TestCredentialEc2, self).setUp()
 

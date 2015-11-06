@@ -106,6 +106,7 @@ class JsonBodyMiddleware(wsgi.Middleware):
     an underscore.
 
     """
+
     def process_request(self, request):
         # Abort early if we don't have any work to do
         params_json = request.body
@@ -259,7 +260,6 @@ class AuthContextMiddleware(wsgi.Middleware):
         :type env: dict
         :returns: True if client_issuer is trusted; otherwise False
         """
-
         if not CONF.tokenless_auth.trusted_issuer:
             return False
 

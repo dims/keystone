@@ -479,7 +479,6 @@ class Auth(controller.V3Controller):
 
     def authenticate(self, context, auth_info, auth_context):
         """Authenticate user."""
-
         # The 'external' method allows any 'REMOTE_USER' based authentication
         # In some cases the server can set REMOTE_USER as '' instead of
         # dropping it, so this must be filtered out
@@ -580,7 +579,7 @@ class Auth(controller.V3Controller):
         if user_id:
             try:
                 user_refs = self.assignment_api.list_projects_for_user(user_id)
-            except exception.UserNotFound:
+            except exception.UserNotFound:  # nosec
                 # federated users have an id but they don't link to anything
                 pass
 
@@ -601,7 +600,7 @@ class Auth(controller.V3Controller):
         if user_id:
             try:
                 user_refs = self.assignment_api.list_domains_for_user(user_id)
-            except exception.UserNotFound:
+            except exception.UserNotFound:  # nosec
                 # federated users have an id but they don't link to anything
                 pass
 
