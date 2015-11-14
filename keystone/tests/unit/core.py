@@ -248,35 +248,59 @@ def new_ref():
         'enabled': True}
 
 
-def new_region_ref():
+def new_region_ref(parent_region_id=None, **kwargs):
     ref = new_ref()
     # Region doesn't have name or enabled.
     del ref['name']
     del ref['enabled']
-    ref['parent_region_id'] = None
+    ref['parent_region_id'] = parent_region_id
+    ref.update(kwargs)
     return ref
 
 
-def new_service_ref():
+def new_service_ref(**kwargs):
     ref = new_ref()
     ref['type'] = uuid.uuid4().hex
+    ref.update(**kwargs)
     return ref
 
 
-def new_endpoint_ref(service_id, interface='public', default_region_id=None,
-                     **kwargs):
+NEEDS_REGION_ID = object()
+
+
+def new_endpoint_ref(service_id, interface='public',
+                     region_id=NEEDS_REGION_ID, **kwargs):
     ref = new_ref()
     del ref['enabled']  # enabled is optional
     ref['interface'] = interface
     ref['service_id'] = service_id
     ref['url'] = 'https://' + uuid.uuid4().hex + '.com'
-    ref['region_id'] = default_region_id
+    if region_id is NEEDS_REGION_ID:
+        ref['region_id'] = uuid.uuid4().hex
+    elif region_id is None and kwargs.get('region', None) is not None:
+        # pre-3.2 form endpoints are not supported by this function
+        raise NotImplementedError("use new_endpoint_ref_with_region")
+    else:
+        ref['region_id'] = region_id
     ref.update(kwargs)
     return ref
 
 
-def new_domain_ref():
+def new_endpoint_ref_with_region(service_id, region, interface='public',
+                                 **kwargs):
+    """Define an endpoint_ref having a pre-3.2 form.
+
+    Contains the deprecated 'region' instead of 'region_id'.
+    """
+    ref = new_endpoint_ref(service_id, interface, region=region,
+                           region_id='invalid', **kwargs)
+    del ref['region_id']
+    return ref
+
+
+def new_domain_ref(**kwargs):
     ref = new_ref()
+    ref.update(**kwargs)
     return ref
 
 
@@ -298,9 +322,14 @@ def new_user_ref(domain_id, project_id=None):
     return ref
 
 
-def new_group_ref(domain_id):
+def new_group_ref(domain_id, **kwargs):
     ref = new_ref()
+
+    # Group does not have enabled field
+    del ref['enabled']
+
     ref['domain_id'] = domain_id
+    ref.update(**kwargs)
     return ref
 
 
@@ -319,11 +348,12 @@ def new_credential_ref(user_id, project_id=None, cred_type=None):
     return ref
 
 
-def new_role_ref():
+def new_role_ref(**kwargs):
     ref = new_ref()
     # Roles don't have a description or the enabled flag
     del ref['description']
     del ref['enabled']
+    ref.update(**kwargs)
     return ref
 
 

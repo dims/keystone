@@ -66,12 +66,11 @@ class IdentityTestProtectedCase(test_v3.RestfulTestCase):
     def load_sample_data(self):
         self._populate_default_domain()
         # Start by creating a couple of domains
-        self.domainA = self.new_domain_ref()
+        self.domainA = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainA['id'], self.domainA)
-        self.domainB = self.new_domain_ref()
+        self.domainB = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainB['id'], self.domainB)
-        self.domainC = self.new_domain_ref()
-        self.domainC['enabled'] = False
+        self.domainC = unit.new_domain_ref(enabled=False)
         self.resource_api.create_domain(self.domainC['id'], self.domainC)
 
         # Now create some users, one in domainA and two of them in domainB
@@ -93,18 +92,18 @@ class IdentityTestProtectedCase(test_v3.RestfulTestCase):
         self.user3 = self.identity_api.create_user(self.user3)
         self.user3['password'] = password
 
-        self.group1 = self.new_group_ref(domain_id=self.domainA['id'])
+        self.group1 = unit.new_group_ref(domain_id=self.domainA['id'])
         self.group1 = self.identity_api.create_group(self.group1)
 
-        self.group2 = self.new_group_ref(domain_id=self.domainA['id'])
+        self.group2 = unit.new_group_ref(domain_id=self.domainA['id'])
         self.group2 = self.identity_api.create_group(self.group2)
 
-        self.group3 = self.new_group_ref(domain_id=self.domainB['id'])
+        self.group3 = unit.new_group_ref(domain_id=self.domainB['id'])
         self.group3 = self.identity_api.create_group(self.group3)
 
-        self.role = self.new_role_ref()
+        self.role = unit.new_role_ref()
         self.role_api.create_role(self.role['id'], self.role)
-        self.role1 = self.new_role_ref()
+        self.role1 = unit.new_role_ref()
         self.role_api.create_role(self.role1['id'], self.role1)
         self.assignment_api.create_grant(self.role['id'],
                                          user_id=self.user1['id'],
@@ -369,9 +368,9 @@ class IdentityTestPolicySample(test_v3.RestfulTestCase):
         self.admin_user = self.identity_api.create_user(self.admin_user)
         self.admin_user['password'] = password
 
-        self.role = self.new_role_ref()
+        self.role = unit.new_role_ref()
         self.role_api.create_role(self.role['id'], self.role)
-        self.admin_role = {'id': uuid.uuid4().hex, 'name': 'admin'}
+        self.admin_role = unit.new_role_ref(name='admin')
         self.role_api.create_role(self.admin_role['id'], self.admin_role)
 
         # Create and assign roles to the project
@@ -617,11 +616,12 @@ class IdentityTestv3CloudPolicySample(test_v3.RestfulTestCase,
     def load_sample_data(self):
         # Start by creating a couple of domains
         self._populate_default_domain()
-        self.domainA = self.new_domain_ref()
+        self.domainA = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainA['id'], self.domainA)
-        self.domainB = self.new_domain_ref()
+        self.domainB = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainB['id'], self.domainB)
-        self.admin_domain = {'id': 'admin_domain_id', 'name': 'Admin_domain'}
+        self.admin_domain = unit.new_domain_ref(id='admin_domain_id',
+                                                name='Admin_domain')
         self.resource_api.create_domain(self.admin_domain['id'],
                                         self.admin_domain)
 
@@ -654,9 +654,9 @@ class IdentityTestv3CloudPolicySample(test_v3.RestfulTestCase,
         self.project_admin_user['password'] = password
 
         # The admin role and another plain role
-        self.admin_role = {'id': uuid.uuid4().hex, 'name': 'admin'}
+        self.admin_role = unit.new_role_ref(name='admin')
         self.role_api.create_role(self.admin_role['id'], self.admin_role)
-        self.role = self.new_role_ref()
+        self.role = unit.new_role_ref()
         self.role_api.create_role(self.role['id'], self.role)
 
         # The cloud admin just gets the admin role
@@ -744,13 +744,13 @@ class IdentityTestv3CloudPolicySample(test_v3.RestfulTestCase,
         self.delete(entity_url, auth=self.auth,
                     expected_status=status_no_data)
 
-        domain_ref = self.new_domain_ref()
+        domain_ref = unit.new_domain_ref()
         self.post('/domains', auth=self.auth, body={'domain': domain_ref},
                   expected_status=status_created)
 
     def _test_grants(self, target, entity_id, expected=None):
         status_OK, status_created, status_no_data = self._stati(expected)
-        a_role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        a_role = unit.new_role_ref()
         self.role_api.create_role(a_role['id'], a_role)
 
         collection_url = (

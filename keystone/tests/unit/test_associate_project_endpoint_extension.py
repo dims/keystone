@@ -18,6 +18,7 @@ import uuid
 from six.moves import http_client
 from testtools import matchers
 
+from keystone.tests import unit
 from keystone.tests.unit import test_v3
 
 
@@ -332,23 +333,23 @@ class EndpointFilterTokenRequestTestCase(TestExtensionCase):
                      'endpoint_id': self.endpoint_id})
 
         # create a second temporary endpoint
-        self.endpoint_id2 = uuid.uuid4().hex
-        self.endpoint2 = self.new_endpoint_ref(service_id=self.service_id)
-        self.endpoint2['id'] = self.endpoint_id2
-        self.catalog_api.create_endpoint(
-            self.endpoint_id2,
-            self.endpoint2.copy())
+        endpoint_id2 = uuid.uuid4().hex
+        endpoint2 = unit.new_endpoint_ref(service_id=self.service_id,
+                                          region_id=self.region_id,
+                                          interface='public',
+                                          id=endpoint_id2)
+        self.catalog_api.create_endpoint(endpoint_id2, endpoint2.copy())
 
         # add second endpoint to default project
         self.put('/OS-EP-FILTER/projects/%(project_id)s'
                  '/endpoints/%(endpoint_id)s' % {
                      'project_id': self.project['id'],
-                     'endpoint_id': self.endpoint_id2})
+                     'endpoint_id': endpoint_id2})
 
         # remove the temporary reference
         # this will create inconsistency in the endpoint filter table
         # which is fixed during the catalog creation for token request
-        self.catalog_api.delete_endpoint(self.endpoint_id2)
+        self.catalog_api.delete_endpoint(endpoint_id2)
 
         auth_data = self.build_authentication_request(
             user_id=self.user['id'],
@@ -403,7 +404,9 @@ class EndpointFilterTokenRequestTestCase(TestExtensionCase):
     def test_multiple_endpoint_project_associations(self):
 
         def _create_an_endpoint():
-            endpoint_ref = self.new_endpoint_ref(service_id=self.service_id)
+            endpoint_ref = unit.new_endpoint_ref(service_id=self.service_id,
+                                                 interface='public',
+                                                 region_id=self.region_id)
             r = self.post('/endpoints', body={'endpoint': endpoint_ref})
             return r.result['endpoint']['id']
 
@@ -875,7 +878,7 @@ class EndpointGroupCRUDTestCase(TestExtensionCase):
 
         """
         # create a service
-        service_ref = self.new_service_ref()
+        service_ref = unit.new_service_ref()
         response = self.post(
             '/services',
             body={'service': service_ref})
@@ -883,10 +886,10 @@ class EndpointGroupCRUDTestCase(TestExtensionCase):
         service_id = response.result['service']['id']
 
         # create an endpoint
-        endpoint_ref = self.new_endpoint_ref(service_id=service_id)
-        response = self.post(
-            '/endpoints',
-            body={'endpoint': endpoint_ref})
+        endpoint_ref = unit.new_endpoint_ref(service_id=service_id,
+                                             interface='public',
+                                             region_id=self.region_id)
+        response = self.post('/endpoints', body={'endpoint': endpoint_ref})
         endpoint_id = response.result['endpoint']['id']
 
         # create an endpoint group
@@ -913,7 +916,7 @@ class EndpointGroupCRUDTestCase(TestExtensionCase):
 
         """
         # create a temporary service
-        service_ref = self.new_service_ref()
+        service_ref = unit.new_service_ref()
         response = self.post('/services', body={'service': service_ref})
         service_id2 = response.result['service']['id']
 
@@ -1056,13 +1059,15 @@ class EndpointGroupCRUDTestCase(TestExtensionCase):
         """Creates an endpoint associated with service and project."""
         if not service_id:
             # create a new service
-            service_ref = self.new_service_ref()
+            service_ref = unit.new_service_ref()
             response = self.post(
                 '/services', body={'service': service_ref})
             service_id = response.result['service']['id']
 
         # create endpoint
-        endpoint_ref = self.new_endpoint_ref(service_id=service_id)
+        endpoint_ref = unit.new_endpoint_ref(service_id=service_id,
+                                             interface='public',
+                                             region_id=self.region_id)
         response = self.post('/endpoints', body={'endpoint': endpoint_ref})
         endpoint = response.result['endpoint']
 

@@ -183,19 +183,17 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
             try:
                 self.resource_api.get_domain(DEFAULT_DOMAIN_ID)
             except exception.DomainNotFound:
-                domain = {'description': (u'Owns users and tenants (i.e. '
-                                          u'projects) available on Identity '
-                                          u'API v2.'),
-                          'enabled': True,
-                          'id': DEFAULT_DOMAIN_ID,
-                          'name': u'Default'}
+                domain = unit.new_domain_ref(
+                    description=(u'Owns users and tenants (i.e. projects)'
+                                 u' available on Identity API v2.'),
+                    id=DEFAULT_DOMAIN_ID,
+                    name=u'Default')
                 self.resource_api.create_domain(DEFAULT_DOMAIN_ID, domain)
 
     def load_sample_data(self):
         self._populate_default_domain()
-        self.domain_id = uuid.uuid4().hex
-        self.domain = self.new_domain_ref()
-        self.domain['id'] = self.domain_id
+        self.domain = unit.new_domain_ref()
+        self.domain_id = self.domain['id']
         self.resource_api.create_domain(self.domain_id, self.domain)
 
         self.project_id = uuid.uuid4().hex
@@ -226,10 +224,8 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         self.default_domain_user_id = self.default_domain_user['id']
 
         # create & grant policy.json's default role for admin_required
-        self.role_id = uuid.uuid4().hex
-        self.role = self.new_role_ref()
-        self.role['id'] = self.role_id
-        self.role['name'] = 'admin'
+        self.role = unit.new_role_ref(name='admin')
+        self.role_id = self.role['id']
         self.role_api.create_role(self.role_id, self.role)
         self.assignment_api.add_role_to_user_and_project(
             self.user_id, self.project_id, self.role_id)
@@ -240,46 +236,26 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
             self.default_domain_user_id, self.project_id,
             self.role_id)
 
-        self.region_id = uuid.uuid4().hex
-        self.region = self.new_region_ref()
-        self.region['id'] = self.region_id
-        self.catalog_api.create_region(
-            self.region.copy())
+        self.region = unit.new_region_ref()
+        self.region_id = self.region['id']
+        self.catalog_api.create_region(self.region.copy())
 
-        self.service_id = uuid.uuid4().hex
-        self.service = self.new_service_ref()
-        self.service['id'] = self.service_id
-        self.catalog_api.create_service(
-            self.service_id,
-            self.service.copy())
+        self.service = unit.new_service_ref()
+        self.service_id = self.service['id']
+        self.catalog_api.create_service(self.service_id, self.service.copy())
 
-        self.endpoint_id = uuid.uuid4().hex
-        self.endpoint = self.new_endpoint_ref(service_id=self.service_id)
-        self.endpoint['id'] = self.endpoint_id
-        self.endpoint['region_id'] = self.region['id']
-        self.catalog_api.create_endpoint(
-            self.endpoint_id,
-            self.endpoint.copy())
+        self.endpoint = unit.new_endpoint_ref(service_id=self.service_id,
+                                              interface='public',
+                                              region_id=self.region_id)
+        self.endpoint_id = self.endpoint['id']
+        self.catalog_api.create_endpoint(self.endpoint_id,
+                                         self.endpoint.copy())
         # The server adds 'enabled' and defaults to True.
         self.endpoint['enabled'] = True
 
     def new_ref(self):
         """Populates a ref with attributes common to some API entities."""
         return unit.new_ref()
-
-    def new_region_ref(self):
-        return unit.new_region_ref()
-
-    def new_service_ref(self):
-        return unit.new_service_ref()
-
-    def new_endpoint_ref(self, service_id, interface='public', **kwargs):
-        return unit.new_endpoint_ref(
-            service_id, interface=interface, default_region_id=self.region_id,
-            **kwargs)
-
-    def new_domain_ref(self):
-        return unit.new_domain_ref()
 
     def new_project_ref(self, domain_id=None, parent_id=None, is_domain=False):
         return unit.new_project_ref(domain_id=domain_id, parent_id=parent_id,
@@ -288,15 +264,9 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
     def new_user_ref(self, domain_id, project_id=None):
         return unit.new_user_ref(domain_id, project_id=project_id)
 
-    def new_group_ref(self, domain_id):
-        return unit.new_group_ref(domain_id)
-
     def new_credential_ref(self, user_id, project_id=None, cred_type=None):
         return unit.new_credential_ref(user_id, project_id=project_id,
                                        cred_type=cred_type)
-
-    def new_role_ref(self):
-        return unit.new_role_ref()
 
     def new_policy_ref(self):
         return unit.new_policy_ref()
@@ -907,6 +877,7 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
             resp,
             'groups',
             self.assertValidGroup,
+            keys_to_check=['name', 'description', 'domain_id'],
             *args,
             **kwargs)
 
@@ -915,6 +886,7 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
             resp,
             'group',
             self.assertValidGroup,
+            keys_to_check=['name', 'description', 'domain_id'],
             *args,
             **kwargs)
 

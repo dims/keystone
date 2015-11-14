@@ -336,9 +336,9 @@ class AuthWithToken(AuthTest):
             self.tenant_bar['id'],
             self.role_member['id'])
         # Now create a group role for this user as well
-        domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain1 = unit.new_domain_ref()
         self.resource_api.create_domain(domain1['id'], domain1)
-        new_group = {'domain_id': domain1['id'], 'name': uuid.uuid4().hex}
+        new_group = unit.new_group_ref(domain_id=domain1['id'])
         new_group = self.identity_api.create_group(new_group)
         self.identity_api.add_user_to_group(self.user_foo['id'],
                                             new_group['id'])
@@ -431,7 +431,7 @@ class AuthWithToken(AuthTest):
         project1 = {'id': 'Project1', 'name': uuid.uuid4().hex,
                     'domain_id': DEFAULT_DOMAIN_ID}
         self.resource_api.create_project(project1['id'], project1)
-        role_one = {'id': 'role_one', 'name': uuid.uuid4().hex}
+        role_one = unit.new_role_ref(id='role_one')
         self.role_api.create_role(role_one['id'], role_one)
         self.assignment_api.add_role_to_user_and_project(
             self.user_foo['id'], project1['id'], role_one['id'])
@@ -469,7 +469,7 @@ class AuthWithToken(AuthTest):
             'name': uuid.uuid4().hex,
             'domain_id': DEFAULT_DOMAIN_ID}
         self.resource_api.create_project(project['id'], project)
-        role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
         self.assignment_api.add_role_to_user_and_project(
             self.user_foo['id'], project['id'], role['id'])
@@ -708,13 +708,8 @@ class AuthWithPasswordCredentials(AuthTest):
         # user in auth data is from the new default domain.
 
         # 1) Create a new domain.
-        new_domain_id = uuid.uuid4().hex
-        new_domain = {
-            'description': uuid.uuid4().hex,
-            'enabled': True,
-            'id': new_domain_id,
-            'name': uuid.uuid4().hex,
-        }
+        new_domain = unit.new_domain_ref()
+        new_domain_id = new_domain['id']
 
         self.resource_api.create_domain(new_domain_id, new_domain)
 
@@ -1328,23 +1323,16 @@ class AuthCatalog(unit.SQLDriverOverrides, AuthTest):
 
     def _create_endpoints(self):
         def create_region(**kwargs):
-            ref = {'id': uuid.uuid4().hex}
-            ref.update(kwargs)
+            ref = unit.new_region_ref(**kwargs)
             self.catalog_api.create_region(ref)
             return ref
 
         def create_endpoint(service_id, region, **kwargs):
-            id_ = uuid.uuid4().hex
-            ref = {
-                'id': id_,
-                'interface': 'public',
-                'region_id': region,
-                'service_id': service_id,
-                'url': 'http://localhost/%s' % uuid.uuid4().hex,
-            }
-            ref.update(kwargs)
-            self.catalog_api.create_endpoint(id_, ref)
-            return ref
+            endpoint = unit.new_endpoint_ref(region_id=region,
+                                             service_id=service_id, **kwargs)
+
+            self.catalog_api.create_endpoint(endpoint['id'], endpoint)
+            return endpoint
 
         # Create a service for use with the endpoints.
         def create_service(**kwargs):

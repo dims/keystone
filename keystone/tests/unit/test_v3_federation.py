@@ -37,6 +37,7 @@ from keystone.contrib.federation import controllers as federation_controllers
 from keystone.contrib.federation import idp as keystone_idp
 from keystone import exception
 from keystone import notifications
+from keystone.tests import unit
 from keystone.tests.unit import core
 from keystone.tests.unit import federation_fixtures
 from keystone.tests.unit import ksfixtures
@@ -209,19 +210,19 @@ class FederatedSetupMixin(object):
     def load_federation_sample_data(self):
         """Inject additional data."""
         # Create and add domains
-        self.domainA = self.new_domain_ref()
+        self.domainA = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainA['id'],
                                         self.domainA)
 
-        self.domainB = self.new_domain_ref()
+        self.domainB = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainB['id'],
                                         self.domainB)
 
-        self.domainC = self.new_domain_ref()
+        self.domainC = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainC['id'],
                                         self.domainC)
 
-        self.domainD = self.new_domain_ref()
+        self.domainD = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainD['id'],
                                         self.domainD)
 
@@ -246,27 +247,24 @@ class FederatedSetupMixin(object):
                                          self.project_inherited)
 
         # Create and add groups
-        self.group_employees = self.new_group_ref(
-            domain_id=self.domainA['id'])
+        self.group_employees = unit.new_group_ref(domain_id=self.domainA['id'])
         self.group_employees = (
             self.identity_api.create_group(self.group_employees))
 
-        self.group_customers = self.new_group_ref(
-            domain_id=self.domainA['id'])
+        self.group_customers = unit.new_group_ref(domain_id=self.domainA['id'])
         self.group_customers = (
             self.identity_api.create_group(self.group_customers))
 
-        self.group_admins = self.new_group_ref(
-            domain_id=self.domainA['id'])
+        self.group_admins = unit.new_group_ref(domain_id=self.domainA['id'])
         self.group_admins = self.identity_api.create_group(self.group_admins)
 
         # Create and add roles
-        self.role_employee = self.new_role_ref()
+        self.role_employee = unit.new_role_ref()
         self.role_api.create_role(self.role_employee['id'], self.role_employee)
-        self.role_customer = self.new_role_ref()
+        self.role_customer = unit.new_role_ref()
         self.role_api.create_role(self.role_customer['id'], self.role_customer)
 
-        self.role_admin = self.new_role_ref()
+        self.role_admin = unit.new_role_ref()
         self.role_api.create_role(self.role_admin['id'], self.role_admin)
 
         # Employees can access
@@ -1908,10 +1906,9 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
 
         """
         # create group and role
-        group = self.new_group_ref(
-            domain_id=self.domainA['id'])
+        group = unit.new_group_ref(domain_id=self.domainA['id'])
         group = self.identity_api.create_group(group)
-        role = self.new_role_ref()
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
 
         # assign role to group and project_admins
@@ -1982,8 +1979,7 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         """
         domain_id = self.domainA['id']
         domain_name = self.domainA['name']
-        group = self.new_group_ref(domain_id=domain_id)
-        group['name'] = 'EXISTS'
+        group = unit.new_group_ref(domain_id=domain_id, name='EXISTS')
         group = self.identity_api.create_group(group)
         rules = {
             'rules': [
@@ -2043,13 +2039,12 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         domain_name = self.domainA['name']
 
         # Add a group "EXISTS"
-        group_exists = self.new_group_ref(domain_id=domain_id)
-        group_exists['name'] = 'EXISTS'
+        group_exists = unit.new_group_ref(domain_id=domain_id, name='EXISTS')
         group_exists = self.identity_api.create_group(group_exists)
 
         # Add a group "NO_EXISTS"
-        group_no_exists = self.new_group_ref(domain_id=domain_id)
-        group_no_exists['name'] = 'NO_EXISTS'
+        group_no_exists = unit.new_group_ref(domain_id=domain_id,
+                                             name='NO_EXISTS')
         group_no_exists = self.identity_api.create_group(group_no_exists)
 
         group_ids = set([group_exists['id'], group_no_exists['id']])
@@ -2117,13 +2112,13 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         domain_name = self.domainA['name']
 
         # Add a group "EXISTS"
-        group_exists = self.new_group_ref(domain_id=domain_id)
-        group_exists['name'] = 'EXISTS'
+        group_exists = unit.new_group_ref(domain_id=domain_id,
+                                          name='EXISTS')
         group_exists = self.identity_api.create_group(group_exists)
 
         # Add a group "NO_EXISTS"
-        group_no_exists = self.new_group_ref(domain_id=domain_id)
-        group_no_exists['name'] = 'NO_EXISTS'
+        group_no_exists = unit.new_group_ref(domain_id=domain_id,
+                                             name='NO_EXISTS')
         group_no_exists = self.identity_api.create_group(group_no_exists)
 
         group_ids = set([group_exists['id'], group_no_exists['id']])
@@ -2188,8 +2183,7 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         """
         domain_id = self.domainA['id']
         domain_name = self.domainA['name']
-        group = self.new_group_ref(domain_id=domain_id)
-        group['name'] = 'EXISTS'
+        group = unit.new_group_ref(domain_id=domain_id, name='EXISTS')
         group = self.identity_api.create_group(group)
         rules = {
             'rules': [
@@ -2252,13 +2246,13 @@ class FederatedTokenTests(FederationTests, FederatedSetupMixin):
         domain_name = self.domainA['name']
 
         # Add a group "EXISTS"
-        group_exists = self.new_group_ref(domain_id=domain_id)
-        group_exists['name'] = 'EXISTS'
+        group_exists = unit.new_group_ref(domain_id=domain_id,
+                                          name='EXISTS')
         group_exists = self.identity_api.create_group(group_exists)
 
         # Add a group "NO_EXISTS"
-        group_no_exists = self.new_group_ref(domain_id=domain_id)
-        group_no_exists['name'] = 'NO_EXISTS'
+        group_no_exists = unit.new_group_ref(domain_id=domain_id,
+                                             name='NO_EXISTS')
         group_no_exists = self.identity_api.create_group(group_no_exists)
 
         group_ids = set([group_exists['id'], group_no_exists['id']])

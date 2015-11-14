@@ -34,8 +34,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
     def setUp(self):
         super(AssignmentTestCase, self).setUp()
 
-        self.group = self.new_group_ref(
-            domain_id=self.domain_id)
+        self.group = unit.new_group_ref(domain_id=self.domain_id)
         self.group = self.identity_api.create_group(self.group)
         self.group_id = self.group['id']
 
@@ -52,7 +51,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
     def test_create_domain(self):
         """Call ``POST /domains``."""
-        ref = self.new_domain_ref()
+        ref = unit.new_domain_ref()
         r = self.post(
             '/domains',
             body={'domain': ref})
@@ -60,7 +59,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
     def test_create_domain_case_sensitivity(self):
         """Call `POST /domains`` twice with upper() and lower() cased name."""
-        ref = self.new_domain_ref()
+        ref = unit.new_domain_ref()
 
         # ensure the name is lowercase
         ref['name'] = ref['name'].lower()
@@ -96,7 +95,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
     def test_update_domain(self):
         """Call ``PATCH /domains/{domain_id}``."""
-        ref = self.new_domain_ref()
+        ref = unit.new_domain_ref()
         del ref['id']
         r = self.patch('/domains/%(domain_id)s' % {
             'domain_id': self.domain_id},
@@ -106,7 +105,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
     def test_disable_domain(self):
         """Call ``PATCH /domains/{domain_id}`` (set enabled=False)."""
         # Create a 2nd set of entities in a 2nd domain
-        self.domain2 = self.new_domain_ref()
+        self.domain2 = unit.new_domain_ref()
         self.resource_api.create_domain(self.domain2['id'], self.domain2)
 
         self.project2 = self.new_project_ref(
@@ -210,7 +209,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
         """
         # Create a 2nd set of entities in a 2nd domain
-        self.domain2 = self.new_domain_ref()
+        self.domain2 = unit.new_domain_ref()
         self.resource_api.create_domain(self.domain2['id'], self.domain2)
 
         self.project2 = self.new_project_ref(
@@ -222,8 +221,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
             project_id=self.project2['id'])
         self.user2 = self.identity_api.create_user(self.user2)
 
-        self.group2 = self.new_group_ref(
-            domain_id=self.domain2['id'])
+        self.group2 = unit.new_group_ref(domain_id=self.domain2['id'])
         self.group2 = self.identity_api.create_group(self.group2)
 
         self.credential2 = self.new_credential_ref(
@@ -289,7 +287,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         # results in a 403 Forbidden.
 
         # Create a new domain that's not the default
-        new_domain = self.new_domain_ref()
+        new_domain = unit.new_domain_ref()
         new_domain_id = new_domain['id']
         self.resource_api.create_domain(new_domain_id, new_domain)
 
@@ -312,7 +310,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         # works.
 
         # Create a new domain that's not the default
-        new_domain = self.new_domain_ref()
+        new_domain = unit.new_domain_ref()
         new_domain_id = new_domain['id']
         self.resource_api.create_domain(new_domain_id, new_domain)
 
@@ -339,7 +337,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         becomes invalid once that domain is disabled.
 
         """
-        self.domain = self.new_domain_ref()
+        self.domain = unit.new_domain_ref()
         self.resource_api.create_domain(self.domain['id'], self.domain)
 
         self.user2 = self.new_user_ref(domain_id=self.domain['id'])
@@ -376,7 +374,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
     def test_delete_domain_hierarchy(self):
         """Call ``DELETE /domains/{domain_id}``."""
-        domain = self.new_domain_ref()
+        domain = unit.new_domain_ref()
         self.resource_api.create_domain(domain['id'], domain)
 
         root_project = self.new_project_ref(
@@ -420,7 +418,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         def create_domains():
             for variation in ('Federated', 'FEDERATED',
                               'federated', 'fEderated'):
-                domain = self.new_domain_ref()
+                domain = unit.new_domain_ref()
                 domain['id'] = variation
                 yield domain
 
@@ -457,8 +455,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         non_default_name = 'beta_federated_domain'
         self.config_fixture.config(group='federation',
                                    federated_domain_name=non_default_name)
-        domain = self.new_domain_ref()
-        domain['name'] = non_default_name
+        domain = unit.new_domain_ref(name=non_default_name)
         self.assertRaises(AssertionError,
                           self.resource_api.create_domain,
                           domain['id'], domain)
@@ -1062,7 +1059,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
     def test_create_role(self):
         """Call ``POST /roles``."""
-        ref = self.new_role_ref()
+        ref = unit.new_role_ref()
         r = self.post(
             '/roles',
             body={'role': ref})
@@ -1088,7 +1085,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
 
     def test_update_role(self):
         """Call ``PATCH /roles/{role_id}``."""
-        ref = self.new_role_ref()
+        ref = unit.new_role_ref()
         del ref['id']
         r = self.patch('/roles/%(role_id)s' % {
             'role_id': self.role_id},
@@ -1103,8 +1100,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
     def test_create_member_role(self):
         """Call ``POST /roles``."""
         # specify only the name on creation
-        ref = self.new_role_ref()
-        ref['name'] = CONF.member_role_name
+        ref = unit.new_role_ref(name=CONF.member_role_name)
         r = self.post(
             '/roles',
             body={'role': ref})
@@ -1640,8 +1636,7 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         password = self.user2['password']
         self.user2 = self.identity_api.create_user(self.user2)
         self.user2['password'] = password
-        self.group1 = self.new_group_ref(
-            domain_id=self.domain['id'])
+        self.group1 = unit.new_group_ref(domain_id=self.domain['id'])
         self.group1 = self.identity_api.create_group(self.group1)
         self.identity_api.add_user_to_group(self.user1['id'],
                                             self.group1['id'])
@@ -1650,9 +1645,9 @@ class AssignmentTestCase(test_v3.RestfulTestCase,
         self.project1 = self.new_project_ref(
             domain_id=self.domain['id'])
         self.resource_api.create_project(self.project1['id'], self.project1)
-        self.role1 = self.new_role_ref()
+        self.role1 = unit.new_role_ref()
         self.role_api.create_role(self.role1['id'], self.role1)
-        self.role2 = self.new_role_ref()
+        self.role2 = unit.new_role_ref()
         self.role_api.create_role(self.role2['id'], self.role2)
 
         # Now add one of each of the four types of assignment
@@ -1816,7 +1811,7 @@ class RoleAssignmentBaseTestCase(test_v3.RestfulTestCase,
         super(RoleAssignmentBaseTestCase, self).load_sample_data()
 
         # Create a domain
-        self.domain = self.new_domain_ref()
+        self.domain = unit.new_domain_ref()
         self.domain_id = self.domain['id']
         self.resource_api.create_domain(self.domain_id, self.domain)
 
@@ -1839,7 +1834,7 @@ class RoleAssignmentBaseTestCase(test_v3.RestfulTestCase,
         # Create 3 groups
         self.group_ids = []
         for i in range(3):
-            group = self.new_group_ref(domain_id=self.domain_id)
+            group = unit.new_group_ref(domain_id=self.domain_id)
             group = self.identity_api.create_group(group)
             self.group_ids.append(group['id'])
 
@@ -1854,7 +1849,7 @@ class RoleAssignmentBaseTestCase(test_v3.RestfulTestCase,
                                          role_id=self.role_id)
 
         # Create a role
-        self.role = self.new_role_ref()
+        self.role = unit.new_role_ref()
         self.role_id = self.role['id']
         self.role_api.create_role(self.role_id, self.role)
 
@@ -2211,7 +2206,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
                              expected_status=http_client.UNAUTHORIZED)
 
         # Create inherited role
-        inherited_role = {'id': uuid.uuid4().hex, 'name': 'inherited'}
+        inherited_role = unit.new_role_ref(name='inherited')
         self.role_api.create_role(inherited_role['id'], inherited_role)
 
         # Grant inherited role for user on domain
@@ -2247,7 +2242,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         user = self.identity_api.create_user(user)
         user['password'] = password
 
-        group = self.new_group_ref(domain_id=self.domain['id'])
+        group = unit.new_group_ref(domain_id=self.domain['id'])
         group = self.identity_api.create_group(group)
         self.identity_api.add_user_to_group(user['id'], group['id'])
 
@@ -2278,7 +2273,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
                              expected_status=http_client.UNAUTHORIZED)
 
         # Create inherited role
-        inherited_role = {'id': uuid.uuid4().hex, 'name': 'inherited'}
+        inherited_role = unit.new_role_ref(name='inherited')
         self.role_api.create_role(inherited_role['id'], inherited_role)
 
         # Grant inherited role for user on domain
@@ -2308,7 +2303,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
 
     def _test_crud_inherited_and_direct_assignment_on_target(self, target_url):
         # Create a new role to avoid assignments loaded from sample data
-        role = self.new_role_ref()
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
 
         # Define URLs
@@ -2351,7 +2346,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
     def test_crud_user_inherited_domain_role_grants(self):
         role_list = []
         for _ in range(2):
-            role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+            role = unit.new_role_ref()
             self.role_api.create_role(role['id'], role)
             role_list.append(role)
 
@@ -2400,11 +2395,11 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         """
         role_list = []
         for _ in range(4):
-            role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+            role = unit.new_role_ref()
             self.role_api.create_role(role['id'], role)
             role_list.append(role)
 
-        domain = self.new_domain_ref()
+        domain = unit.new_domain_ref()
         self.resource_api.create_domain(domain['id'], domain)
         user1 = self.new_user_ref(
             domain_id=domain['id'])
@@ -2496,11 +2491,11 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         """
         role_list = []
         for _ in range(4):
-            role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+            role = unit.new_role_ref()
             self.role_api.create_role(role['id'], role)
             role_list.append(role)
 
-        domain = self.new_domain_ref()
+        domain = unit.new_domain_ref()
         self.resource_api.create_domain(domain['id'], domain)
         user1 = self.new_user_ref(
             domain_id=domain['id'])
@@ -2588,11 +2583,11 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         """
         role_list = []
         for _ in range(4):
-            role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+            role = unit.new_role_ref()
             self.role_api.create_role(role['id'], role)
             role_list.append(role)
 
-        domain = self.new_domain_ref()
+        domain = unit.new_domain_ref()
         self.resource_api.create_domain(domain['id'], domain)
         user1 = self.new_user_ref(
             domain_id=domain['id'])
@@ -2604,8 +2599,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         password = user2['password']
         user2 = self.identity_api.create_user(user2)
         user2['password'] = password
-        group1 = self.new_group_ref(
-            domain_id=domain['id'])
+        group1 = unit.new_group_ref(domain_id=domain['id'])
         group1 = self.identity_api.create_group(group1)
         self.identity_api.add_user_to_group(user1['id'],
                                             group1['id'])
@@ -2694,19 +2688,18 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         """
         role_list = []
         for _ in range(5):
-            role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+            role = unit.new_role_ref()
             self.role_api.create_role(role['id'], role)
             role_list.append(role)
 
-        domain = self.new_domain_ref()
+        domain = unit.new_domain_ref()
         self.resource_api.create_domain(domain['id'], domain)
         user1 = self.new_user_ref(
             domain_id=domain['id'])
         password = user1['password']
         user1 = self.identity_api.create_user(user1)
         user1['password'] = password
-        group1 = self.new_group_ref(
-            domain_id=domain['id'])
+        group1 = unit.new_group_ref(domain_id=domain['id'])
         group1 = self.identity_api.create_group(group1)
         project1 = self.new_project_ref(
             domain_id=domain['id'])
@@ -2788,9 +2781,9 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
         self.resource_api.create_project(leaf['id'], leaf)
 
         # Create 'non-inherited' and 'inherited' roles
-        non_inherited_role = {'id': uuid.uuid4().hex, 'name': 'non-inherited'}
+        non_inherited_role = unit.new_role_ref(name='non-inherited')
         self.role_api.create_role(non_inherited_role['id'], non_inherited_role)
-        inherited_role = {'id': uuid.uuid4().hex, 'name': 'inherited'}
+        inherited_role = unit.new_role_ref(name='inherited')
         self.role_api.create_role(inherited_role['id'], inherited_role)
 
         return (root['id'], leaf['id'],
@@ -2860,7 +2853,7 @@ class AssignmentInheritanceTestCase(test_v3.RestfulTestCase,
             self._setup_hierarchical_projects_scenario())
 
         # Create group and add user to it
-        group = self.new_group_ref(domain_id=self.domain['id'])
+        group = unit.new_group_ref(domain_id=self.domain['id'])
         group = self.identity_api.create_group(group)
         self.identity_api.add_user_to_group(self.user['id'], group['id'])
 
@@ -3079,7 +3072,7 @@ class AssignmentInheritanceDisabledTestCase(test_v3.RestfulTestCase):
         self.config_fixture.config(group='os_inherit', enabled=False)
 
     def test_crud_inherited_role_grants_failed_if_disabled(self):
-        role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
 
         base_collection_url = (

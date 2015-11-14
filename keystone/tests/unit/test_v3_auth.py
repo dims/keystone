@@ -149,12 +149,7 @@ class TokenAPITests(object):
         # able to validate a v3 token with user in the new domain.
 
         # 1) Create a new domain for the user.
-        new_domain = {
-            'description': uuid.uuid4().hex,
-            'enabled': True,
-            'id': uuid.uuid4().hex,
-            'name': uuid.uuid4().hex,
-        }
+        new_domain = unit.new_domain_ref()
         self.resource_api.create_domain(new_domain['id'], new_domain)
 
         # 2) Create user in new domain.
@@ -481,7 +476,7 @@ class AllowRescopeScopedTokenDisabledTests(test_v3.RestfulTestCase):
 
     def test_rescoped_domain_token_disabled(self):
 
-        self.domainA = self.new_domain_ref()
+        self.domainA = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainA['id'], self.domainA)
         self.assignment_api.create_grant(self.role['id'],
                                          user_id=self.user['id'],
@@ -616,7 +611,7 @@ class TestTokenRevokeSelfAndAdmin(test_v3.RestfulTestCase):
         """
         super(TestTokenRevokeSelfAndAdmin, self).load_sample_data()
         # DomainA setup
-        self.domainA = self.new_domain_ref()
+        self.domainA = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainA['id'], self.domainA)
 
         self.userAdminA = self.new_user_ref(domain_id=self.domainA['id'])
@@ -718,7 +713,7 @@ class TestTokenRevokeSelfAndAdmin(test_v3.RestfulTestCase):
 
     def test_adminB_fails_revoking_userA_token(self):
         # DomainB setup
-        self.domainB = self.new_domain_ref()
+        self.domainB = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainB['id'], self.domainB)
         self.userAdminB = self.new_user_ref(domain_id=self.domainB['id'])
         password = self.userAdminB['password']
@@ -786,9 +781,9 @@ class TestTokenRevokeById(test_v3.RestfulTestCase):
         super(TestTokenRevokeById, self).setUp()
 
         # Start by creating a couple of domains and projects
-        self.domainA = self.new_domain_ref()
+        self.domainA = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainA['id'], self.domainA)
-        self.domainB = self.new_domain_ref()
+        self.domainB = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainB['id'], self.domainB)
         self.projectA = self.new_project_ref(domain_id=self.domainA['id'])
         self.resource_api.create_project(self.projectA['id'], self.projectA)
@@ -814,16 +809,13 @@ class TestTokenRevokeById(test_v3.RestfulTestCase):
         self.user3 = self.identity_api.create_user(self.user3)
         self.user3['password'] = password
 
-        self.group1 = self.new_group_ref(
-            domain_id=self.domainA['id'])
+        self.group1 = unit.new_group_ref(domain_id=self.domainA['id'])
         self.group1 = self.identity_api.create_group(self.group1)
 
-        self.group2 = self.new_group_ref(
-            domain_id=self.domainA['id'])
+        self.group2 = unit.new_group_ref(domain_id=self.domainA['id'])
         self.group2 = self.identity_api.create_group(self.group2)
 
-        self.group3 = self.new_group_ref(
-            domain_id=self.domainB['id'])
+        self.group3 = unit.new_group_ref(domain_id=self.domainB['id'])
         self.group3 = self.identity_api.create_group(self.group3)
 
         self.identity_api.add_user_to_group(self.user1['id'],
@@ -833,9 +825,9 @@ class TestTokenRevokeById(test_v3.RestfulTestCase):
         self.identity_api.add_user_to_group(self.user3['id'],
                                             self.group2['id'])
 
-        self.role1 = self.new_role_ref()
+        self.role1 = unit.new_role_ref()
         self.role_api.create_role(self.role1['id'], self.role1)
-        self.role2 = self.new_role_ref()
+        self.role2 = unit.new_role_ref()
         self.role_api.create_role(self.role2['id'], self.role2)
 
         self.assignment_api.create_grant(self.role2['id'],
@@ -874,7 +866,7 @@ class TestTokenRevokeById(test_v3.RestfulTestCase):
                   expected_status=http_client.OK)
 
         # create a new role
-        role = self.new_role_ref()
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
 
         # assign a new role
@@ -2041,7 +2033,7 @@ class TestAuth(test_v3.RestfulTestCase):
           tokens
 
         """
-        domainA = self.new_domain_ref()
+        domainA = unit.new_domain_ref()
         self.resource_api.create_domain(domainA['id'], domainA)
         projectA = self.new_project_ref(domain_id=domainA['id'])
         self.resource_api.create_project(projectA['id'], projectA)
@@ -2058,12 +2050,10 @@ class TestAuth(test_v3.RestfulTestCase):
         user2 = self.identity_api.create_user(user2)
         user2['password'] = password
 
-        group1 = self.new_group_ref(
-            domain_id=domainA['id'])
+        group1 = unit.new_group_ref(domain_id=domainA['id'])
         group1 = self.identity_api.create_group(group1)
 
-        group2 = self.new_group_ref(
-            domain_id=domainA['id'])
+        group2 = unit.new_group_ref(domain_id=domainA['id'])
         group2 = self.identity_api.create_group(group2)
 
         self.identity_api.add_user_to_group(user1['id'],
@@ -2074,7 +2064,7 @@ class TestAuth(test_v3.RestfulTestCase):
         # Now create all the roles and assign them
         role_list = []
         for _ in range(8):
-            role = self.new_role_ref()
+            role = unit.new_role_ref()
             self.role_api.create_role(role['id'], role)
             role_list.append(role)
 
@@ -2155,7 +2145,7 @@ class TestAuth(test_v3.RestfulTestCase):
     def test_auth_token_cross_domain_group_and_project(self):
         """Verify getting a token in cross domain group/project roles."""
         # create domain, project and group and grant roles to user
-        domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain1 = unit.new_domain_ref()
         self.resource_api.create_domain(domain1['id'], domain1)
         project1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex,
                     'domain_id': domain1['id']}
@@ -2164,21 +2154,17 @@ class TestAuth(test_v3.RestfulTestCase):
         password = user_foo['password']
         user_foo = self.identity_api.create_user(user_foo)
         user_foo['password'] = password
-        role_member = {'id': uuid.uuid4().hex,
-                       'name': uuid.uuid4().hex}
+        role_member = unit.new_role_ref()
         self.role_api.create_role(role_member['id'], role_member)
-        role_admin = {'id': uuid.uuid4().hex,
-                      'name': uuid.uuid4().hex}
+        role_admin = unit.new_role_ref()
         self.role_api.create_role(role_admin['id'], role_admin)
-        role_foo_domain1 = {'id': uuid.uuid4().hex,
-                            'name': uuid.uuid4().hex}
+        role_foo_domain1 = unit.new_role_ref()
         self.role_api.create_role(role_foo_domain1['id'], role_foo_domain1)
-        role_group_domain1 = {'id': uuid.uuid4().hex,
-                              'name': uuid.uuid4().hex}
+        role_group_domain1 = unit.new_role_ref()
         self.role_api.create_role(role_group_domain1['id'], role_group_domain1)
         self.assignment_api.add_user_to_project(project1['id'],
                                                 user_foo['id'])
-        new_group = {'domain_id': domain1['id'], 'name': uuid.uuid4().hex}
+        new_group = unit.new_group_ref(domain_id=domain1['id'])
         new_group = self.identity_api.create_group(new_group)
         self.identity_api.add_user_to_group(user_foo['id'],
                                             new_group['id'])
@@ -2314,8 +2300,7 @@ class TestAuth(test_v3.RestfulTestCase):
         self.assertValidDomainScopedTokenResponse(r)
 
     def test_domain_scope_token_with_group_role(self):
-        group = self.new_group_ref(
-            domain_id=self.domain_id)
+        group = unit.new_group_ref(domain_id=self.domain_id)
         group = self.identity_api.create_group(group)
 
         # add user to group
@@ -2621,7 +2606,7 @@ class TestAuth(test_v3.RestfulTestCase):
         self.assertValidUnscopedTokenResponse(r)
 
     def test_disabled_default_project_domain_result_in_unscoped_token(self):
-        domain_ref = self.new_domain_ref()
+        domain_ref = unit.new_domain_ref()
         r = self.post('/domains', body={'domain': domain_ref})
         domain = self.assertValidDomainResponse(r, domain_ref)
 
@@ -2660,8 +2645,7 @@ class TestAuth(test_v3.RestfulTestCase):
 
     def test_disabled_scope_project_domain_result_in_401(self):
         # create a disabled domain
-        domain = self.new_domain_ref()
-        domain['enabled'] = False
+        domain = unit.new_domain_ref(enabled=False)
         self.resource_api.create_domain(domain['id'], domain)
 
         # create a project in the disabled domain
@@ -2885,7 +2869,7 @@ class TestTrustRedelegation(test_v3.RestfulTestCase):
 
     def test_roles_subset(self):
         # Build second role
-        role = self.new_role_ref()
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
         # assign a new role to the user
         self.assignment_api.create_grant(role_id=role['id'],
@@ -2953,7 +2937,7 @@ class TestTrustRedelegation(test_v3.RestfulTestCase):
         trust_token = self._get_trust_token(trust)
 
         # Build second trust with a role not in parent's roles
-        role = self.new_role_ref()
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
         # assign a new role to the user
         self.assignment_api.create_grant(role_id=role['id'],
@@ -3649,7 +3633,7 @@ class TestTrustAuth(test_v3.RestfulTestCase):
 
     def test_trust_deleted_grant(self):
         # create a new role
-        role = self.new_role_ref()
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
 
         grant_url = (
@@ -3702,7 +3686,7 @@ class TestTrustAuth(test_v3.RestfulTestCase):
         sub_trustee_user_id = sub_trustee_user['id']
 
         # create a new role
-        role = self.new_role_ref()
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
 
         # assign the new role to trustee

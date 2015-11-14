@@ -19,6 +19,7 @@ from oslo_config import cfg
 from oslo_serialization import jsonutils
 from six.moves import range
 
+from keystone.tests import unit
 from keystone.tests.unit import filtering
 from keystone.tests.unit.ksfixtures import temporaryfile
 from keystone.tests.unit import test_v3
@@ -56,11 +57,11 @@ class IdentityTestFilteredCase(filtering.FilterTests,
         """
         # Start by creating a few domains
         self._populate_default_domain()
-        self.domainA = self.new_domain_ref()
+        self.domainA = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainA['id'], self.domainA)
-        self.domainB = self.new_domain_ref()
+        self.domainB = unit.new_domain_ref()
         self.resource_api.create_domain(self.domainB['id'], self.domainB)
-        self.domainC = self.new_domain_ref()
+        self.domainC = unit.new_domain_ref()
         self.domainC['enabled'] = False
         self.resource_api.create_domain(self.domainC['id'], self.domainC)
 
@@ -81,7 +82,7 @@ class IdentityTestFilteredCase(filtering.FilterTests,
         self.user3 = self.identity_api.create_user(self.user3)
         self.user3['password'] = password
 
-        self.role = self.new_role_ref()
+        self.role = unit.new_role_ref()
         self.role_api.create_role(self.role['id'], self.role)
         self.assignment_api.create_grant(self.role['id'],
                                          user_id=self.user1['id'],
@@ -310,7 +311,7 @@ class IdentityTestFilteredCase(filtering.FilterTests,
 
         # See if we can add a SQL command...use the group table instead of the
         # user table since 'user' is reserved word for SQLAlchemy.
-        group = self.new_group_ref(domain_id=self.domainB['id'])
+        group = unit.new_group_ref(domain_id=self.domainB['id'])
         group = self.identity_api.create_group(group)
 
         url_by_name = "/users?name=x'; drop table group"

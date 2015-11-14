@@ -348,7 +348,7 @@ class SqlUpgradeTests(SqlMigrateBase):
 
         def add_service():
             service_id = uuid.uuid4().hex
-
+            # Older style service ref, must create by hand
             service = {
                 'id': service_id,
                 'type': uuid.uuid4().hex
@@ -361,6 +361,8 @@ class SqlUpgradeTests(SqlMigrateBase):
         def add_endpoint(service_id, region):
             endpoint_id = uuid.uuid4().hex
 
+            # Can't use new_endpoint_ref to make the older style endpoint
+            # so make it by hand.
             endpoint = {
                 'id': endpoint_id,
                 'interface': uuid.uuid4().hex[:8],
@@ -569,7 +571,7 @@ class SqlUpgradeTests(SqlMigrateBase):
         """Update service name data from `extra` to empty string."""
         def add_service(**extra_data):
             service_id = uuid.uuid4().hex
-
+            # Older style service ref, must create by hand
             service = {
                 'id': service_id,
                 'type': uuid.uuid4().hex,

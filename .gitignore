@@ -32,3 +32,5 @@ keystone/tests/tmp/
 keystone/locale/*/LC_MESSAGES/*.mo
 .testrepository/
 *.db
+# Files created by releasenotes build
+releasenotes/build

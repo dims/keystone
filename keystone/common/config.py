@@ -198,7 +198,7 @@ FILE_OPTIONS = {
                          'already have assignments for users and '
                          'groups from the default LDAP domain, and it is '
                          'acceptable for Keystone to provide the different '
-                         'IDs to clients than it did previously.  Typically '
+                         'IDs to clients than it did previously. Typically '
                          'this means that the only time you can set this '
                          'value to False is when configuring a fresh '
                          'installation.'),
@@ -280,12 +280,12 @@ FILE_OPTIONS = {
                     'allow_rescoped_scoped_token to false prevents a user '
                     'from exchanging a scoped token for any other token.'),
         cfg.StrOpt('hash_algorithm', default='md5',
-                   help="The hash algorithm to use for PKI tokens. This can "
-                        "be set to any algorithm that hashlib supports. "
-                        "WARNING: Before changing this value, the auth_token "
-                        "middleware must be configured with the "
-                        "hash_algorithms, otherwise token revocation will "
-                        "not be processed correctly."),
+                   help='The hash algorithm to use for PKI tokens. This can '
+                        'be set to any algorithm that hashlib supports. '
+                        'WARNING: Before changing this value, the auth_token '
+                        'middleware must be configured with the '
+                        'hash_algorithms, otherwise token revocation will '
+                        'not be processed correctly.'),
     ],
     'revoke': [
         cfg.StrOpt('driver',
@@ -593,6 +593,10 @@ FILE_OPTIONS = {
         cfg.StrOpt('user_enabled_emulation_dn',
                    help='DN of the group entry to hold enabled users when '
                         'using enabled emulation.'),
+        cfg.BoolOpt('user_enabled_emulation_use_group_config', default=False,
+                    help='Use the "group_member_attribute" and '
+                         '"group_objectclass" settings to determine '
+                         'membership in the emulated enabled group.'),
         cfg.ListOpt('user_additional_attribute_mapping',
                     default=[],
                     help='List of additional LDAP attributes used for mapping '
@@ -684,6 +688,11 @@ FILE_OPTIONS = {
                    deprecated_for_removal=True,
                    help='DN of the group entry to hold enabled projects when '
                         'using enabled emulation.'),
+        cfg.BoolOpt('project_enabled_emulation_use_group_config',
+                    default=False,
+                    help='Use the "group_member_attribute" and '
+                         '"group_objectclass" settings to determine '
+                         'membership in the emulated enabled group.'),
         cfg.ListOpt('project_additional_attribute_mapping',
                     deprecated_opts=[cfg.DeprecatedOpt(
                         'tenant_additional_attribute_mapping', group='ldap')],
@@ -1039,14 +1048,14 @@ FILE_OPTIONS = {
                    help='The port number which the admin service listens '
                         'on.'),
         cfg.BoolOpt('wsgi_keep_alive', default=True,
-                    help="If set to false, disables keepalives on the server; "
-                         "all connections will be closed after serving one "
-                         "request."),
+                    help='If set to false, disables keepalives on the server; '
+                         'all connections will be closed after serving one '
+                         'request.'),
         cfg.IntOpt('client_socket_timeout', default=900,
-                   help="Timeout for socket operations on a client "
-                        "connection. If an incoming connection is idle for "
-                        "this number of seconds it will be closed. A value "
-                        "of '0' means wait forever."),
+                   help='Timeout for socket operations on a client '
+                        'connection. If an incoming connection is idle for '
+                        'this number of seconds it will be closed. A value '
+                        'of "0" means wait forever.'),
         cfg.BoolOpt('tcp_keepalive', default=False,
                     deprecated_name='tcp_keepalive',
                     deprecated_group='DEFAULT',
@@ -1071,7 +1080,7 @@ FILE_OPTIONS = {
                     help='Toggle for SSL support on the Keystone '
                          'eventlet servers.'),
         cfg.StrOpt('certfile',
-                   default="/etc/keystone/ssl/certs/keystone.pem",
+                   default='/etc/keystone/ssl/certs/keystone.pem',
                    deprecated_name='certfile', deprecated_group='ssl',
                    deprecated_for_removal=True,
                    help='Path of the certfile for SSL. For non-production '

@@ -157,6 +157,24 @@ class UnexpectedExceptionTestCase(ExceptionTestCase):
             '%s %s' % (self.exc_str, exception.SecurityError.amendment),
             six.text_type(e))
 
+    def test_unexpected_error_custom_message_exception_debug(self):
+        self.config_fixture.config(debug=True)
+        orig_e = exception.NotFound(target=uuid.uuid4().hex)
+        e = exception.UnexpectedError(orig_e)
+        self.assertEqual(
+            '%s %s' % (six.text_type(orig_e),
+                       exception.SecurityError.amendment),
+            six.text_type(e))
+
+    def test_unexpected_error_custom_message_binary_debug(self):
+        self.config_fixture.config(debug=True)
+        binary_msg = b'something'
+        e = exception.UnexpectedError(binary_msg)
+        self.assertEqual(
+            '%s %s' % (six.text_type(binary_msg),
+                       exception.SecurityError.amendment),
+            six.text_type(e))
+
 
 class SecurityErrorTestCase(ExceptionTestCase):
     """Tests whether security-related info is exposed to the API user."""
@@ -206,23 +224,48 @@ class SecurityErrorTestCase(ExceptionTestCase):
         self.assertValidJsonRendering(e)
         self.assertNotIn(risky_info, six.text_type(e))
         self.assertIn(action, six.text_type(e))
+        self.assertNotIn(exception.SecurityError.amendment, six.text_type(e))
 
-        e = exception.ForbiddenAction(action=risky_info)
+        e = exception.ForbiddenAction(action=action)
         self.assertValidJsonRendering(e)
-        self.assertIn(risky_info, six.text_type(e))
+        self.assertIn(action, six.text_type(e))
+        self.assertNotIn(exception.SecurityError.amendment, six.text_type(e))
 
     def test_forbidden_action_exposure_in_debug(self):
         self.config_fixture.config(debug=True)
 
         risky_info = uuid.uuid4().hex
+        action = uuid.uuid4().hex
 
-        e = exception.ForbiddenAction(message=risky_info)
+        e = exception.ForbiddenAction(message=risky_info, action=action)
         self.assertValidJsonRendering(e)
         self.assertIn(risky_info, six.text_type(e))
+        self.assertIn(exception.SecurityError.amendment, six.text_type(e))
 
-        e = exception.ForbiddenAction(action=risky_info)
+        e = exception.ForbiddenAction(action=action)
         self.assertValidJsonRendering(e)
-        self.assertIn(risky_info, six.text_type(e))
+        self.assertIn(action, six.text_type(e))
+        self.assertIn(exception.SecurityError.amendment, six.text_type(e))
+
+    def test_forbidden_action_no_message(self):
+        # When no custom message is given when the ForbiddenAction (or other
+        # SecurityError subclass) is created the exposed message is the same
+        # whether debug is enabled or not.
+
+        action = uuid.uuid4().hex
+
+        self.config_fixture.config(debug=False)
+        e = exception.ForbiddenAction(action=action)
+        exposed_message = six.text_type(e)
+        self.assertIn(action, exposed_message)
+        self.assertNotIn(exception.SecurityError.amendment, six.text_type(e))
+
+        self.config_fixture.config(debug=True)
+        e = exception.ForbiddenAction(action=action)
+        # Note that the message is the same it's just got the
+        # SecurityError.amendment added to it, see bug 1496530.
+        self.assertIn(exposed_message, six.text_type(e))
+        self.assertIn(exception.SecurityError.amendment, six.text_type(e))
 
     def test_unicode_argument_message(self):
         self.config_fixture.config(debug=False)

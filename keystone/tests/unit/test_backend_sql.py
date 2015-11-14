@@ -335,14 +335,14 @@ class SqlIdentity(SqlTests, test_backend.IdentityTests):
         session.close()
 
     def test_list_domains_for_user(self):
-        domain = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain = unit.new_domain_ref()
         self.resource_api.create_domain(domain['id'], domain)
         user = {'name': uuid.uuid4().hex, 'password': uuid.uuid4().hex,
                 'domain_id': domain['id'], 'enabled': True}
 
-        test_domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        test_domain1 = unit.new_domain_ref()
         self.resource_api.create_domain(test_domain1['id'], test_domain1)
-        test_domain2 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        test_domain2 = unit.new_domain_ref()
         self.resource_api.create_domain(test_domain2['id'], test_domain2)
 
         user = self.identity_api.create_user(user)
@@ -361,21 +361,21 @@ class SqlIdentity(SqlTests, test_backend.IdentityTests):
         # Create two groups each with a role on a different domain, and
         # make user1 a member of both groups.  Both these new domains
         # should now be included, along with any direct user grants.
-        domain = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain = unit.new_domain_ref()
         self.resource_api.create_domain(domain['id'], domain)
         user = {'name': uuid.uuid4().hex, 'password': uuid.uuid4().hex,
                 'domain_id': domain['id'], 'enabled': True}
         user = self.identity_api.create_user(user)
-        group1 = {'name': uuid.uuid4().hex, 'domain_id': domain['id']}
+        group1 = unit.new_group_ref(domain_id=domain['id'])
         group1 = self.identity_api.create_group(group1)
-        group2 = {'name': uuid.uuid4().hex, 'domain_id': domain['id']}
+        group2 = unit.new_group_ref(domain_id=domain['id'])
         group2 = self.identity_api.create_group(group2)
 
-        test_domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        test_domain1 = unit.new_domain_ref()
         self.resource_api.create_domain(test_domain1['id'], test_domain1)
-        test_domain2 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        test_domain2 = unit.new_domain_ref()
         self.resource_api.create_domain(test_domain2['id'], test_domain2)
-        test_domain3 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        test_domain3 = unit.new_domain_ref()
         self.resource_api.create_domain(test_domain3['id'], test_domain3)
 
         self.identity_api.add_user_to_group(user['id'], group1['id'])
@@ -405,17 +405,17 @@ class SqlIdentity(SqlTests, test_backend.IdentityTests):
         - When listing domains for user, neither domain should be returned
 
         """
-        domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain1 = unit.new_domain_ref()
         domain1 = self.resource_api.create_domain(domain1['id'], domain1)
-        domain2 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        domain2 = unit.new_domain_ref()
         domain2 = self.resource_api.create_domain(domain2['id'], domain2)
         user = {'name': uuid.uuid4().hex, 'password': uuid.uuid4().hex,
                 'domain_id': domain1['id'], 'enabled': True}
         user = self.identity_api.create_user(user)
-        group = {'name': uuid.uuid4().hex, 'domain_id': domain1['id']}
+        group = unit.new_group_ref(domain_id=domain1['id'])
         group = self.identity_api.create_group(group)
         self.identity_api.add_user_to_group(user['id'], group['id'])
-        role = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        role = unit.new_role_ref()
         self.role_api.create_role(role['id'], role)
 
         # Create a grant on each domain, one user grant, one group grant,
@@ -539,22 +539,13 @@ class SqlCatalog(SqlTests, test_backend.CatalogTests):
     _enabled_default_to_true_when_creating_endpoint = True
 
     def test_catalog_ignored_malformed_urls(self):
-        service = {
-            'id': uuid.uuid4().hex,
-            'type': uuid.uuid4().hex,
-            'name': uuid.uuid4().hex,
-            'description': uuid.uuid4().hex,
-        }
+        service = unit.new_service_ref()
         self.catalog_api.create_service(service['id'], service.copy())
 
         malformed_url = "http://192.168.1.104:8774/v2/$(tenant)s"
-        endpoint = {
-            'id': uuid.uuid4().hex,
-            'region_id': None,
-            'service_id': service['id'],
-            'interface': 'public',
-            'url': malformed_url,
-        }
+        endpoint = unit.new_endpoint_ref(service_id=service['id'],
+                                         url=malformed_url,
+                                         region_id=None)
         self.catalog_api.create_endpoint(endpoint['id'], endpoint.copy())
 
         # NOTE(dstanek): there are no valid URLs, so nothing is in the catalog
@@ -562,21 +553,11 @@ class SqlCatalog(SqlTests, test_backend.CatalogTests):
         self.assertEqual({}, catalog)
 
     def test_get_catalog_with_empty_public_url(self):
-        service = {
-            'id': uuid.uuid4().hex,
-            'type': uuid.uuid4().hex,
-            'name': uuid.uuid4().hex,
-            'description': uuid.uuid4().hex,
-        }
+        service = unit.new_service_ref()
         self.catalog_api.create_service(service['id'], service.copy())
 
-        endpoint = {
-            'id': uuid.uuid4().hex,
-            'region_id': None,
-            'interface': 'public',
-            'url': '',
-            'service_id': service['id'],
-        }
+        endpoint = unit.new_endpoint_ref(url='', service_id=service['id'],
+                                         region_id=None)
         self.catalog_api.create_endpoint(endpoint['id'], endpoint.copy())
 
         catalog = self.catalog_api.get_catalog('user', 'tenant')
@@ -588,21 +569,11 @@ class SqlCatalog(SqlTests, test_backend.CatalogTests):
         self.assertIsNone(catalog_endpoint.get('internalURL'))
 
     def test_create_endpoint_region_returns_not_found(self):
-        service = {
-            'id': uuid.uuid4().hex,
-            'type': uuid.uuid4().hex,
-            'name': uuid.uuid4().hex,
-            'description': uuid.uuid4().hex,
-        }
+        service = unit.new_service_ref()
         self.catalog_api.create_service(service['id'], service.copy())
 
-        endpoint = {
-            'id': uuid.uuid4().hex,
-            'region_id': uuid.uuid4().hex,
-            'service_id': service['id'],
-            'interface': 'public',
-            'url': uuid.uuid4().hex,
-        }
+        endpoint = unit.new_endpoint_ref(region_id=uuid.uuid4().hex,
+                                         service_id=service['id'])
 
         self.assertRaises(exception.ValidationError,
                           self.catalog_api.create_endpoint,
@@ -610,21 +581,16 @@ class SqlCatalog(SqlTests, test_backend.CatalogTests):
                           endpoint.copy())
 
     def test_create_region_invalid_id(self):
-        region = {
-            'id': '0' * 256,
-            'description': '',
-            'extra': {},
-        }
+        region = unit.new_region_ref(id='0' * 256,
+                                     description='',
+                                     extra={})
 
         self.assertRaises(exception.StringLengthExceeded,
                           self.catalog_api.create_region,
                           region.copy())
 
     def test_create_region_invalid_parent_id(self):
-        region = {
-            'id': uuid.uuid4().hex,
-            'parent_region_id': '0' * 256,
-        }
+        region = unit.new_region_ref(parent_region_id='0' * 256)
 
         self.assertRaises(exception.RegionNotFound,
                           self.catalog_api.create_region,
@@ -632,49 +598,29 @@ class SqlCatalog(SqlTests, test_backend.CatalogTests):
 
     def test_delete_region_with_endpoint(self):
         # create a region
-        region = {
-            'id': uuid.uuid4().hex,
-            'description': uuid.uuid4().hex,
-        }
+        region = unit.new_region_ref()
         self.catalog_api.create_region(region)
 
         # create a child region
-        child_region = {
-            'id': uuid.uuid4().hex,
-            'description': uuid.uuid4().hex,
-            'parent_id': region['id']
-        }
+        child_region = unit.new_region_ref(parent_region_id=region['id'])
         self.catalog_api.create_region(child_region)
         # create a service
-        service = {
-            'id': uuid.uuid4().hex,
-            'type': uuid.uuid4().hex,
-            'name': uuid.uuid4().hex,
-            'description': uuid.uuid4().hex,
-        }
+        service = unit.new_service_ref()
         self.catalog_api.create_service(service['id'], service)
 
         # create an endpoint attached to the service and child region
-        child_endpoint = {
-            'id': uuid.uuid4().hex,
-            'region_id': child_region['id'],
-            'interface': uuid.uuid4().hex[:8],
-            'url': uuid.uuid4().hex,
-            'service_id': service['id'],
-        }
+        child_endpoint = unit.new_endpoint_ref(region_id=child_region['id'],
+                                               service_id=service['id'])
+
         self.catalog_api.create_endpoint(child_endpoint['id'], child_endpoint)
         self.assertRaises(exception.RegionDeletionError,
                           self.catalog_api.delete_region,
                           child_region['id'])
 
         # create an endpoint attached to the service and parent region
-        endpoint = {
-            'id': uuid.uuid4().hex,
-            'region_id': region['id'],
-            'interface': uuid.uuid4().hex[:8],
-            'url': uuid.uuid4().hex,
-            'service_id': service['id'],
-        }
+        endpoint = unit.new_endpoint_ref(region_id=region['id'],
+                                         service_id=service['id'])
+
         self.catalog_api.create_endpoint(endpoint['id'], endpoint)
         self.assertRaises(exception.RegionDeletionError,
                           self.catalog_api.delete_region,
@@ -717,7 +663,7 @@ class SqlFilterTests(SqlTests, test_backend.FilterTests):
         # since any domain filtering with LDAP is handled by the manager
         # layer (and is already tested elsewhere) not at the driver level.
         self.addCleanup(self.clean_up_entities)
-        self.domain1 = {'id': uuid.uuid4().hex, 'name': uuid.uuid4().hex}
+        self.domain1 = unit.new_domain_ref()
         self.resource_api.create_domain(self.domain1['id'], self.domain1)
 
         self.entity_list = {}
@@ -757,7 +703,7 @@ class SqlFilterTests(SqlTests, test_backend.FilterTests):
 
         # See if we can add a SQL command...use the group table instead of the
         # user table since 'user' is reserved word for SQLAlchemy.
-        group = {'name': uuid.uuid4().hex, 'domain_id': DEFAULT_DOMAIN_ID}
+        group = unit.new_group_ref(domain_id=DEFAULT_DOMAIN_ID)
         group = self.identity_api.create_group(group)
 
         hints = driver_hints.Hints()
