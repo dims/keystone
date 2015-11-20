@@ -20,9 +20,9 @@ from oslo_log import log
 
 from keystone.auth import controllers
 from keystone.common import dependency
-from keystone.contrib.federation import constants as federation_constants
-from keystone.contrib.federation import utils
 from keystone import exception
+from keystone.federation import constants as federation_constants
+from keystone.federation import utils
 from keystone.i18n import _
 
 
@@ -85,13 +85,13 @@ class TokenlessAuthHelper(object):
 
     def get_scope(self):
         auth = {}
-        # NOTE(chioleong): auth methods here are insignificant because
+        # NOTE(chioleong): Auth methods here are insignificant because
         # we only care about using auth.controllers.AuthInfo
         # to validate the scope information. Therefore,
         # we don't provide any identity.
         auth['scope'] = self._build_scope_info()
 
-        # NOTE(chioleong): we'll let AuthInfo validate the scope for us
+        # NOTE(chioleong): We'll let AuthInfo validate the scope for us
         auth_info = controllers.AuthInfo.create({}, auth, scope_only=True)
         return auth_info.get_scope()
 

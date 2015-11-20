@@ -15,16 +15,20 @@
 import copy
 import uuid
 
+import mock
 from oslo_config import cfg
+from oslo_log import versionutils
 from oslo_serialization import jsonutils
 from pycadf import cadftaxonomy
 from six.moves import http_client
 from six.moves import urllib
 
-from keystone.contrib import oauth1
-from keystone.contrib.oauth1 import controllers
-from keystone.contrib.oauth1 import core
+from keystone.contrib.oauth1 import routers
 from keystone import exception
+from keystone import oauth1
+from keystone.oauth1 import controllers
+from keystone.oauth1 import core
+from keystone.tests import unit
 from keystone.tests.unit.common import test_notifications
 from keystone.tests.unit.ksfixtures import temporaryfile
 from keystone.tests.unit import test_v3
@@ -33,10 +37,17 @@ from keystone.tests.unit import test_v3
 CONF = cfg.CONF
 
 
-class OAuth1Tests(test_v3.RestfulTestCase):
+class OAuth1ContribTests(test_v3.RestfulTestCase):
 
-    EXTENSION_NAME = 'oauth1'
-    EXTENSION_TO_ADD = 'oauth1_extension'
+    @mock.patch.object(versionutils, 'report_deprecated_feature')
+    def test_exception_happens(self, mock_deprecator):
+        routers.OAuth1Extension(mock.ANY)
+        mock_deprecator.assert_called_once_with(mock.ANY, mock.ANY)
+        args, _kwargs = mock_deprecator.call_args
+        self.assertIn("Remove oauth1_extension from", args[1])
+
+
+class OAuth1Tests(test_v3.RestfulTestCase):
 
     CONSUMER_URL = '/OS-OAUTH1/consumers'
 
@@ -388,7 +399,7 @@ class AuthTokenTests(OAuthFlowTests):
         self.assertEqual(self.role_id, roles_list[0]['id'])
 
         # verify that the token can perform delegated tasks
-        ref = self.new_user_ref(domain_id=self.domain_id)
+        ref = unit.new_user_ref(domain_id=self.domain_id)
         r = self.admin_request(path='/v3/users', headers=headers,
                                method='POST', body={'user': ref})
         self.assertValidUserResponse(r, ref)

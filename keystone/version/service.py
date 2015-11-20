@@ -26,10 +26,13 @@ from keystone import catalog
 from keystone.common import wsgi
 from keystone import credential
 from keystone import endpoint_policy
+from keystone import federation
 from keystone.i18n import _LW
 from keystone import identity
+from keystone import oauth1
 from keystone import policy
 from keystone import resource
+from keystone import revoke
 from keystone import token
 from keystone import trust
 from keystone.version import controllers
@@ -129,7 +132,10 @@ def v3_app_factory(global_conf, **local_conf):
                       credential,
                       identity,
                       policy,
-                      resource]
+                      resource,
+                      revoke,
+                      federation,
+                      oauth1]
 
     if CONF.trust.enabled:
         router_modules.append(trust)
