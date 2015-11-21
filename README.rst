@@ -18,7 +18,7 @@ The API specification and documentation are available at:
 
 The canonical client library is available at:
 
-    https://git.openstack.org/cgit/openstack/python-keystoneclient/
+    https://git.openstack.org/cgit/openstack/python-keystoneclient
 
 Documentation for cloud administrators is available at:
 

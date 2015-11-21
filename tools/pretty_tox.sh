@@ -3,7 +3,7 @@
 set -o pipefail
 
 TESTRARGS=$1
-python setup.py testr --testr-args="--subunit $TESTRARGS" | subunit-trace -f --no-summary
+python setup.py testr --testr-args="--subunit $TESTRARGS" | subunit-trace -f
 retval=$?
 # NOTE(mtreinish) The pipe above would eat the slowest display from pbr's testr
 # wrapper so just manually print the slowest tests.
