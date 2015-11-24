@@ -169,9 +169,8 @@ BASE_EP_FILTER = BASE_EP_FILTER_PREFIX + '/endpoint_groups/{endpoint_group_id}'
 BASE_ACCESS_TOKEN = (
     '/users/{user_id}/OS-OAUTH1/access_tokens/{access_token_id}')
 
-# TODO(stevemar): Use BASE_IDP_PROTOCOL when bug 1420125 is resolved.
-FEDERATED_AUTH_URL = ('/OS-FEDERATION/identity_providers/{identity_provider}'
-                      '/protocols/{protocol}/auth')
+FEDERATED_AUTH_URL = ('/OS-FEDERATION/identity_providers/{idp_id}'
+                      '/protocols/{protocol_id}/auth')
 FEDERATED_IDP_SPECIFIC_WEBSSO = ('/auth/OS-FEDERATION/identity_providers/'
                                  '{idp_id}/protocols/{protocol_id}/websso')
 
@@ -231,8 +230,8 @@ V3_JSON_HOME_RESOURCES_INHERIT_DISABLED = {
     _build_ec2tokens_relation(resource_name='user_credential'): {
         'href-template': '/users/{user_id}/credentials/OS-EC2/{credential_id}',
         'href-vars': {
-            'credential_id': json_home.build_v3_extension_parameter_relation(
-                'OS-EC2', '1.0', 'credential_id'),
+            'credential_id':
+            json_home.build_v3_parameter_relation('credential_id'),
             'user_id': json_home.Parameters.USER_ID, }},
     _build_ec2tokens_relation(resource_name='user_credentials'): {
         'href-template': '/users/{user_id}/credentials/OS-EC2',
@@ -394,12 +393,11 @@ V3_JSON_HOME_RESOURCES_INHERIT_DISABLED = {
         'href-template': BASE_IDP_PROTOCOL,
         'href-vars': {
             'idp_id': IDP_ID_PARAMETER_RELATION}},
-    # TODO(stevemar): Update href-vars when bug 1420125 is resolved.
     _build_federation_rel(resource_name='identity_provider_protocol_auth'): {
         'href-template': FEDERATED_AUTH_URL,
         'href-vars': {
-            'identity_provider': IDP_ID_PARAMETER_RELATION,
-            'protocol': PROTOCOL_ID_PARAM_RELATION, }},
+            'idp_id': IDP_ID_PARAMETER_RELATION,
+            'protocol_id': PROTOCOL_ID_PARAM_RELATION, }},
     _build_oauth1_rel(resource_name='access_tokens'): {
         'href': '/OS-OAUTH1/access_token'},
     _build_oauth1_rel(resource_name='request_tokens'): {
