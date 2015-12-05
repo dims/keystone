@@ -196,10 +196,8 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         self.domain_id = self.domain['id']
         self.resource_api.create_domain(self.domain_id, self.domain)
 
-        self.project_id = uuid.uuid4().hex
-        self.project = self.new_project_ref(
-            domain_id=self.domain_id)
-        self.project['id'] = self.project_id
+        self.project = unit.new_project_ref(domain_id=self.domain_id)
+        self.project_id = self.project['id']
         self.resource_api.create_project(self.project_id, self.project)
 
         self.user = unit.create_user(self.identity_api,
@@ -207,7 +205,7 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         self.user_id = self.user['id']
 
         self.default_domain_project_id = uuid.uuid4().hex
-        self.default_domain_project = self.new_project_ref(
+        self.default_domain_project = unit.new_project_ref(
             domain_id=DEFAULT_DOMAIN_ID)
         self.default_domain_project['id'] = self.default_domain_project_id
         self.resource_api.create_project(self.default_domain_project_id,
@@ -233,7 +231,7 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
 
         self.region = unit.new_region_ref()
         self.region_id = self.region['id']
-        self.catalog_api.create_region(self.region.copy())
+        self.catalog_api.create_region(self.region)
 
         self.service = unit.new_service_ref()
         self.service_id = self.service['id']
@@ -252,10 +250,6 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         """Populates a ref with attributes common to some API entities."""
         return unit.new_ref()
 
-    def new_project_ref(self, domain_id=None, parent_id=None, is_domain=False):
-        return unit.new_project_ref(domain_id=domain_id, parent_id=parent_id,
-                                    is_domain=is_domain)
-
     def new_credential_ref(self, user_id, project_id=None, cred_type=None):
         return unit.new_credential_ref(user_id, project_id=project_id,
                                        cred_type=cred_type)
@@ -263,20 +257,9 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
     def new_policy_ref(self):
         return unit.new_policy_ref()
 
-    def new_trust_ref(self, trustor_user_id, trustee_user_id, project_id=None,
-                      impersonation=None, expires=None, role_ids=None,
-                      role_names=None, remaining_uses=None,
-                      allow_redelegation=False):
-        return unit.new_trust_ref(
-            trustor_user_id, trustee_user_id, project_id=project_id,
-            impersonation=impersonation, expires=expires, role_ids=role_ids,
-            role_names=role_names, remaining_uses=remaining_uses,
-            allow_redelegation=allow_redelegation)
-
     def create_new_default_project_for_user(self, user_id, domain_id,
                                             enable_project=True):
-        ref = self.new_project_ref(domain_id=domain_id)
-        ref['enabled'] = enable_project
+        ref = unit.new_project_ref(domain_id=domain_id, enabled=enable_project)
         r = self.post('/projects', body={'project': ref})
         project = self.assertValidProjectResponse(r, ref)
         # set the user's preferred project
@@ -572,6 +555,7 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         require_catalog = kwargs.pop('require_catalog', True)
         endpoint_filter = kwargs.pop('endpoint_filter', False)
         ep_filter_assoc = kwargs.pop('ep_filter_assoc', 0)
+        is_admin_project = kwargs.pop('is_admin_project', False)
         token = self.assertValidTokenResponse(r, *args, **kwargs)
 
         if require_catalog:
@@ -598,6 +582,11 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         for role in token['roles']:
             self.assertIn('id', role)
             self.assertIn('name', role)
+
+        if is_admin_project:
+            self.assertIs(True, token['is_admin_project'])
+        else:
+            self.assertNotIn('is_admin_project', token)
 
         return token
 

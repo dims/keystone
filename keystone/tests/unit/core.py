@@ -303,11 +303,12 @@ def new_domain_ref(**kwargs):
     return ref
 
 
-def new_project_ref(domain_id=None, parent_id=None, is_domain=False):
+def new_project_ref(domain_id=None, parent_id=None, is_domain=False, **kwargs):
     ref = new_ref()
     ref['domain_id'] = domain_id
     ref['parent_id'] = parent_id
     ref['is_domain'] = is_domain
+    ref.update(kwargs)
     return ref
 
 
@@ -371,7 +372,7 @@ def new_policy_ref():
 def new_trust_ref(trustor_user_id, trustee_user_id, project_id=None,
                   impersonation=None, expires=None, role_ids=None,
                   role_names=None, remaining_uses=None,
-                  allow_redelegation=False):
+                  allow_redelegation=False, **kwargs):
     ref = dict()
     ref['id'] = uuid.uuid4().hex
     ref['trustor_user_id'] = trustor_user_id
@@ -401,6 +402,7 @@ def new_trust_ref(trustor_user_id, trustee_user_id, project_id=None,
         for role_name in role_names:
             ref['roles'].append({'name': role_name})
 
+    ref.update(kwargs)
     return ref
 
 
