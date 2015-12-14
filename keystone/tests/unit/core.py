@@ -16,6 +16,8 @@ from __future__ import absolute_import
 import atexit
 import datetime
 import functools
+import hashlib
+import json
 import logging
 import os
 import re
@@ -349,20 +351,52 @@ def new_group_ref(domain_id, **kwargs):
     return ref
 
 
-def new_credential_ref(user_id, project_id=None, cred_type=None):
+def new_credential_ref(user_id, project_id=None, type='cert', **kwargs):
     ref = {
         'id': uuid.uuid4().hex,
         'user_id': user_id,
+        'type': type,
     }
-    if cred_type == 'ec2':
-        ref['type'] = 'ec2'
-        ref['blob'] = uuid.uuid4().hex
-    else:
-        ref['type'] = 'cert'
-        ref['blob'] = uuid.uuid4().hex
+
     if project_id:
         ref['project_id'] = project_id
+    if 'blob' not in kwargs:
+        ref['blob'] = uuid.uuid4().hex
+
+    ref.update(kwargs)
     return ref
+
+
+def new_cert_credential(user_id, project_id=None, blob=None, **kwargs):
+    if blob is None:
+        blob = {'access': uuid.uuid4().hex, 'secret': uuid.uuid4().hex}
+
+    credential = new_credential_ref(user_id=user_id,
+                                    project_id=project_id,
+                                    blob=json.dumps(blob),
+                                    type='cert',
+                                    **kwargs)
+    return blob, credential
+
+
+def new_ec2_credential(user_id, project_id=None, blob=None, **kwargs):
+    if blob is None:
+        blob = {
+            'access': uuid.uuid4().hex,
+            'secret': uuid.uuid4().hex,
+            'trust_id': None
+        }
+
+    if 'id' not in kwargs:
+        access = blob['access'].encode('utf-8')
+        kwargs['id'] = hashlib.sha256(access).hexdigest()
+
+    credential = new_credential_ref(user_id=user_id,
+                                    project_id=project_id,
+                                    blob=json.dumps(blob),
+                                    type='ec2',
+                                    **kwargs)
+    return blob, credential
 
 
 def new_role_ref(**kwargs):
@@ -374,15 +408,19 @@ def new_role_ref(**kwargs):
     return ref
 
 
-def new_policy_ref():
-    return {
+def new_policy_ref(**kwargs):
+    ref = {
         'id': uuid.uuid4().hex,
         'name': uuid.uuid4().hex,
         'description': uuid.uuid4().hex,
         'enabled': True,
-        'blob': uuid.uuid4().hex,
+        # Store serialized JSON data as the blob to mimic real world usage.
+        'blob': json.dumps({'data': uuid.uuid4().hex, }),
         'type': uuid.uuid4().hex,
     }
+
+    ref.update(kwargs)
+    return ref
 
 
 def new_trust_ref(trustor_user_id, trustee_user_id, project_id=None,
@@ -800,3 +838,21 @@ class SQLDriverOverrides(object):
         self.config_fixture.config(group='revoke', driver='sql')
         self.config_fixture.config(group='token', driver='sql')
         self.config_fixture.config(group='trust', driver='sql')
+        self.sql_driver_version_overrides = {}
+
+    def use_specific_sql_driver_version(self, driver_path,
+                                        versionless_backend, version_suffix):
+        """Add this versioned driver to the list that will be loaded.
+
+        :param driver_path: The path to the drivers, e.g. 'keystone.assignment'
+        :param versionless_backend: The name of the versionless drivers, e.g.
+                                    'backends'
+        :param version_suffix: The suffix for the version , e.g. 'V8_'
+
+        This method assumes that versioned drivers are named:
+        <version_suffix><name of versionless driver>, e.g. 'V8_backends'.
+
+        """
+        self.sql_driver_version_overrides[driver_path] = {
+            'versionless_backend': versionless_backend,
+            'versioned_backend': version_suffix + versionless_backend}
