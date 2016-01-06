@@ -63,7 +63,6 @@ from keystone.version import service
 
 config.configure()
 
-LOG = log.getLogger(__name__)
 PID = six.text_type(os.getpid())
 TESTSDIR = os.path.dirname(os.path.abspath(__file__))
 TESTCONF = os.path.join(TESTSDIR, 'config_files')
@@ -661,7 +660,7 @@ class TestCase(BaseTestCase):
         This is useful to load managers initialized by extensions. No extra
         backends are loaded by default.
 
-        :return: dict of name -> manager
+        :returns: dict of name -> manager
         """
         return {}
 

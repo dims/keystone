@@ -19,7 +19,6 @@ import fixtures
 from lxml import etree
 import mock
 from oslo_config import cfg
-from oslo_log import log
 from oslo_log import versionutils
 from oslo_utils import importutils
 from oslotest import mockpatch
@@ -51,7 +50,6 @@ from keystone.token.providers import common as token_common
 subprocess = environment.subprocess
 
 CONF = cfg.CONF
-LOG = log.getLogger(__name__)
 ROOTDIR = os.path.dirname(os.path.abspath(__file__))
 XMLDIR = os.path.join(ROOTDIR, 'saml2/')
 
@@ -1141,7 +1139,7 @@ class FederatedIdentityProviderTests(test_v3.RestfulTestCase):
     def test_update_idp_immutable_attributes(self):
         """Update IdP's immutable parameters.
 
-        Expect HTTP FORBIDDEN.
+        Expect HTTP BAD REQUEST.
 
         """
         default_resp = self._create_default_idp()
@@ -1156,7 +1154,7 @@ class FederatedIdentityProviderTests(test_v3.RestfulTestCase):
 
         url = self.base_url(suffix=idp_id)
         self.patch(url, body={'identity_provider': body},
-                   expected_status=http_client.FORBIDDEN)
+                   expected_status=http_client.BAD_REQUEST)
 
     def test_update_nonexistent_idp(self):
         """Update nonexistent IdP

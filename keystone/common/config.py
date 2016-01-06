@@ -116,6 +116,12 @@ FILE_OPTIONS = {
                         'original request, even if it was removed by an SSL '
                         'terminating proxy. Typical value is '
                         '"HTTP_X_FORWARDED_PROTO".'),
+        cfg.BoolOpt('insecure_debug', default=False,
+                    help='If set to true the server will return information '
+                         'in the response that may allow an unauthenticated '
+                         'or authenticated user to get more information than '
+                         'normal, such as why authentication failed. This may '
+                         'be useful for debugging but is insecure.'),
     ],
     'identity': [
         cfg.StrOpt('default_domain_id', default='default',
@@ -222,10 +228,13 @@ FILE_OPTIONS = {
                    help='Entrypoint for the trust backend driver in the '
                         'keystone.trust namespace.')],
     'os_inherit': [
-        cfg.BoolOpt('enabled', default=False,
+        cfg.BoolOpt('enabled', default=True,
+                    deprecated_for_removal=True,
                     help='role-assignment inheritance to projects from '
                          'owning domain or from projects higher in the '
-                         'hierarchy can be optionally enabled.'),
+                         'hierarchy can be optionally disabled. In the '
+                         'future, this option will be removed and the '
+                         'hierarchy will be always enabled.'),
     ],
     'fernet_tokens': [
         cfg.StrOpt('key_repository',
@@ -394,6 +403,18 @@ FILE_OPTIONS = {
                    'operations on remote services. Tokens scoped to '
                    'this project will contain the key/value '
                    '`is_admin_project=true`. Defaults to None.'),
+        cfg.StrOpt('project_name_url_safe',
+                   choices=['off', 'new'], default='off',
+                   help='Whether the names of projects are restricted from '
+                        'containing url reserved characters. If set to new, '
+                        'attempts to create or update a project with a url '
+                        'unsafe name will return an error.'),
+        cfg.StrOpt('domain_name_url_safe',
+                   choices=['off', 'new'], default='off',
+                   help='Whether the names of domains are restricted from '
+                        'containing url reserved characters. If set to new, '
+                        'attempts to create or update a domain with a url '
+                        'unsafe name will return an error.'),
     ],
     'domain_config': [
         cfg.StrOpt('driver',
@@ -1040,12 +1061,12 @@ FILE_OPTIONS = {
                    deprecated_for_removal=True,
                    help='The IP address of the network interface for the '
                         'public service to listen on.'),
-        cfg.IntOpt('public_port', default=5000, min=1, max=65535,
-                   deprecated_name='public_port',
-                   deprecated_group='DEFAULT',
-                   deprecated_for_removal=True,
-                   help='The port number which the public service listens '
-                        'on.'),
+        cfg.PortOpt('public_port', default=5000,
+                    deprecated_name='public_port',
+                    deprecated_group='DEFAULT',
+                    deprecated_for_removal=True,
+                    help='The port number which the public service listens '
+                         'on.'),
         cfg.StrOpt('admin_bind_host',
                    default='0.0.0.0',  # nosec : Bind to all interfaces by
                    # default for backwards compatibility.
@@ -1056,12 +1077,12 @@ FILE_OPTIONS = {
                    deprecated_for_removal=True,
                    help='The IP address of the network interface for the '
                         'admin service to listen on.'),
-        cfg.IntOpt('admin_port', default=35357, min=1, max=65535,
-                   deprecated_name='admin_port',
-                   deprecated_group='DEFAULT',
-                   deprecated_for_removal=True,
-                   help='The port number which the admin service listens '
-                        'on.'),
+        cfg.PortOpt('admin_port', default=35357,
+                    deprecated_name='admin_port',
+                    deprecated_group='DEFAULT',
+                    deprecated_for_removal=True,
+                    help='The port number which the admin service listens '
+                         'on.'),
         cfg.BoolOpt('wsgi_keep_alive', default=True,
                     help='If set to false, disables keepalives on the server; '
                          'all connections will be closed after serving one '
@@ -1086,7 +1107,7 @@ FILE_OPTIONS = {
                    deprecated_for_removal=True,
                    help='Sets the value of TCP_KEEPIDLE in seconds for each '
                         'server socket. Only applies if tcp_keepalive is '
-                        'true.'),
+                        'true. Ignored if system does not support it.'),
     ],
     'eventlet_server_ssl': [
         cfg.BoolOpt('enable', default=False, deprecated_name='enable',
@@ -1211,8 +1232,8 @@ def configure(conf=None):
         cfg.StrOpt('pydev-debug-host',
                    help='Host to connect to for remote debugger.'))
     conf.register_cli_opt(
-        cfg.IntOpt('pydev-debug-port', min=1, max=65535,
-                   help='Port to connect to for remote debugger.'))
+        cfg.PortOpt('pydev-debug-port',
+                    help='Port to connect to for remote debugger.'))
 
     for section in FILE_OPTIONS:
         for option in FILE_OPTIONS[section]:

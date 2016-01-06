@@ -78,7 +78,7 @@ class IdentityProvider(_ControllerBase):
 
     @classmethod
     def _add_self_referential_link(cls, context, ref):
-        id = ref.get('id')
+        id = ref['id']
         self_path = '/'.join([cls.base_url(context), id])
         ref.setdefault('links', {})
         ref['links']['self'] = self_path
@@ -91,6 +91,7 @@ class IdentityProvider(_ControllerBase):
         return {cls.member_name: ref}
 
     @controller.protected()
+    @validation.validated(schema.identity_provider_create, 'identity_provider')
     def create_identity_provider(self, context, idp_id, identity_provider):
         identity_provider = self._normalize_dict(identity_provider)
         identity_provider.setdefault('enabled', False)
@@ -115,6 +116,7 @@ class IdentityProvider(_ControllerBase):
         self.federation_api.delete_idp(idp_id)
 
     @controller.protected()
+    @validation.validated(schema.identity_provider_update, 'identity_provider')
     def update_identity_provider(self, context, idp_id, identity_provider):
         identity_provider = self._normalize_dict(identity_provider)
         IdentityProvider.check_immutable_params(identity_provider)
@@ -179,6 +181,7 @@ class FederationProtocol(_ControllerBase):
         return {cls.member_name: ref}
 
     @controller.protected()
+    @validation.validated(schema.federation_protocol_schema, 'protocol')
     def create_protocol(self, context, idp_id, protocol_id, protocol):
         ref = self._normalize_dict(protocol)
         FederationProtocol.check_immutable_params(ref)
@@ -187,6 +190,7 @@ class FederationProtocol(_ControllerBase):
         return wsgi.render_response(body=response, status=('201', 'Created'))
 
     @controller.protected()
+    @validation.validated(schema.federation_protocol_schema, 'protocol')
     def update_protocol(self, context, idp_id, protocol_id, protocol):
         ref = self._normalize_dict(protocol)
         FederationProtocol.check_immutable_params(ref)
@@ -263,7 +267,7 @@ class Auth(auth_controllers.Auth):
 
         """
         if 'origin' in context['query_string']:
-            origin = context['query_string'].get('origin')
+            origin = context['query_string']['origin']
             host = urllib.parse.unquote_plus(origin)
         else:
             msg = _('Request must have an origin query parameter')
@@ -343,7 +347,7 @@ class Auth(auth_controllers.Auth):
         sp_id = auth['scope']['service_provider']['id']
         service_provider = self.federation_api.get_sp(sp_id)
         utils.assert_enabled_service_provider_object(service_provider)
-        sp_url = service_provider.get('sp_url')
+        sp_url = service_provider['sp_url']
 
         token_id = auth['identity']['token']['id']
         token_data = self.token_provider_api.validate_token(token_id)
@@ -397,7 +401,7 @@ class Auth(auth_controllers.Auth):
         """
         t = self._create_base_saml_assertion(context, auth)
         (saml_assertion, service_provider) = t
-        relay_state_prefix = service_provider.get('relay_state_prefix')
+        relay_state_prefix = service_provider['relay_state_prefix']
 
         generator = keystone_idp.ECPGenerator()
         ecp_assertion = generator.generate_ecp(saml_assertion,

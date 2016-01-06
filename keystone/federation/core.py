@@ -15,7 +15,6 @@
 import abc
 
 from oslo_config import cfg
-from oslo_log import log as logging
 import six
 
 from keystone.common import dependency
@@ -26,7 +25,6 @@ from keystone.federation import utils
 
 
 CONF = cfg.CONF
-LOG = logging.getLogger(__name__)
 EXTENSION_DATA = {
     'name': 'OpenStack Federation APIs',
     'namespace': 'http://docs.openstack.org/identity/api/ext/'
@@ -64,8 +62,8 @@ class Manager(manager.Manager):
         Service Provider in a catalog contains three attributes: ``id``,
         ``auth_url``, ``sp_url``, where:
 
-        - id is an unique, user defined identifier for service provider object
-        - auth_url is a authentication URL of remote Keystone
+        - id is a unique, user defined identifier for service provider object
+        - auth_url is an authentication URL of remote Keystone
         - sp_url a URL accessible at the remote service provider where SAML
           assertion is transmitted.
 
@@ -249,7 +247,7 @@ class FederationDriverV8(object):
     def list_mappings(self):
         """List all mappings.
 
-        returns: list of mappings
+        :returns: list of mappings
 
         """
         raise exception.NotImplemented()  # pragma: no cover
@@ -315,7 +313,7 @@ class FederationDriverV8(object):
     def list_sps(self):
         """List all service providers.
 
-        :returns List of sp_ref objects
+        :returns: List of sp_ref objects
         :rtype: list of dicts
 
         """
@@ -359,8 +357,8 @@ class FederationDriverV8(object):
         Service Provider in a catalog contains three attributes: ``id``,
         ``auth_url``, ``sp_url``, where:
 
-        - id is an unique, user defined identifier for service provider object
-        - auth_url is a authentication URL of remote Keystone
+        - id is a unique, user defined identifier for service provider object
+        - auth_url is an authentication URL of remote Keystone
         - sp_url a URL accessible at the remote service provider where SAML
           assertion is transmitted.
 
