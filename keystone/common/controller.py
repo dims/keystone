@@ -247,27 +247,13 @@ class V2Controller(wsgi.Application):
     @staticmethod
     def filter_domain_id(ref):
         """Remove domain_id since v2 calls are not domain-aware."""
-        if 'domain_id' in ref:
-            if ref['domain_id'] != CONF.identity.default_domain_id:
-                raise exception.Unauthorized(
-                    _('Non-default domain is not supported'))
-            del ref['domain_id']
+        ref.pop('domain_id', None)
         return ref
 
     @staticmethod
     def filter_domain(ref):
-        """Remove domain since v2 calls are not domain-aware.
-
-        V3 Fernet tokens builds the users with a domain in the token data.
-        This method will ensure that users create in v3 belong to the default
-        domain.
-
-        """
-        if 'domain' in ref:
-            if ref['domain'].get('id') != CONF.identity.default_domain_id:
-                raise exception.Unauthorized(
-                    _('Non-default domain is not supported'))
-            del ref['domain']
+        """Remove domain since v2 calls are not domain-aware."""
+        ref.pop('domain', None)
         return ref
 
     @staticmethod
@@ -310,15 +296,9 @@ class V2Controller(wsgi.Application):
     def v3_to_v2_user(ref):
         """Convert a user_ref from v3 to v2 compatible.
 
-        - v2.0 users are not domain aware, and should have domain_id validated
-          to be the default domain, and then removed.
-
-        - v2.0 users expect the use of tenantId instead of default_project_id.
-
-        - v2.0 users have a username attribute.
-
-        This method should only be applied to user_refs being returned from the
-        v2.0 controller(s).
+        * v2.0 users are not domain aware, and should have domain_id removed
+        * v2.0 users expect the use of tenantId instead of default_project_id
+        * v2.0 users have a username attribute
 
         If ref is a list type, we will iterate through each element and do the
         conversion.
@@ -425,8 +405,6 @@ class V3Controller(wsgi.Application):
 
     Class parameters:
 
-    * `_mutable_parameters` - set of parameters that can be changed by users.
-                              Usually used by cls.check_immutable_params()
     * `_public_parameters` - set of parameters that are exposed to the user.
                              Usually used by cls.filter_params()
 
@@ -821,37 +799,11 @@ class V3Controller(wsgi.Application):
             LOG.debug('RBAC: Authorization granted')
 
     @classmethod
-    def check_immutable_params(cls, ref):
-        """Raise exception when disallowed parameter is in ref.
-
-        Check whether the ref dictionary representing a request has only
-        mutable parameters included. If not, raise an exception. This method
-        checks only root-level keys from a ref dictionary.
-
-        :param ref: a dictionary representing deserialized request to be
-                    stored
-        :raises: :class:`keystone.exception.ImmutableAttributeError`
-
-        """
-        ref_keys = set(ref.keys())
-        blocked_keys = ref_keys.difference(cls._mutable_parameters)
-
-        if not blocked_keys:
-            # No immutable parameters changed
-            return
-
-        exception_args = {'target': cls.__name__,
-                          'attributes': ', '.join(blocked_keys)}
-        raise exception.ImmutableAttributeError(**exception_args)
-
-    @classmethod
     def filter_params(cls, ref):
         """Remove unspecified parameters from the dictionary.
 
-        This function removes unspecified parameters from the dictionary. See
-        check_immutable_parameters for corresponding function that raises
-        exceptions. This method checks only root-level keys from a ref
-        dictionary.
+        This function removes unspecified parameters from the dictionary.
+        This method checks only root-level keys from a ref dictionary.
 
         :param ref: a dictionary representing deserialized response to be
                     serialized
