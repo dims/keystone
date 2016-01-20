@@ -301,6 +301,9 @@ FILE_OPTIONS = {
                         'middleware must be configured with the '
                         'hash_algorithms, otherwise token revocation will '
                         'not be processed correctly.'),
+        cfg.BoolOpt('infer_roles', default=True,
+                    help='Add roles to token that are not explicitly added, '
+                    'but that are linked implicitly to other roles.'),
     ],
     'revoke': [
         cfg.StrOpt('driver',
@@ -404,17 +407,21 @@ FILE_OPTIONS = {
                    'this project will contain the key/value '
                    '`is_admin_project=true`. Defaults to None.'),
         cfg.StrOpt('project_name_url_safe',
-                   choices=['off', 'new'], default='off',
+                   choices=['off', 'new', 'strict'], default='off',
                    help='Whether the names of projects are restricted from '
                         'containing url reserved characters. If set to new, '
                         'attempts to create or update a project with a url '
-                        'unsafe name will return an error.'),
+                        'unsafe name will return an error. In addition, if '
+                        'set to strict, attempts to scope a token using '
+                        'an unsafe project name will return an error.'),
         cfg.StrOpt('domain_name_url_safe',
-                   choices=['off', 'new'], default='off',
+                   choices=['off', 'new', 'strict'], default='off',
                    help='Whether the names of domains are restricted from '
                         'containing url reserved characters. If set to new, '
                         'attempts to create or update a domain with a url '
-                        'unsafe name will return an error.'),
+                        'unsafe name will return an error. In addition, if '
+                        'set to strict, attempts to scope a token using a '
+                        'domain name which is unsafe will return an error.'),
     ],
     'domain_config': [
         cfg.StrOpt('driver',
