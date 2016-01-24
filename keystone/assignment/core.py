@@ -28,7 +28,7 @@ from keystone.common import driver_hints
 from keystone.common import manager
 from keystone import exception
 from keystone.i18n import _
-from keystone.i18n import _LI
+from keystone.i18n import _LI, _LE
 from keystone import notifications
 
 
@@ -612,8 +612,10 @@ class Manager(manager.Manager):
             implied_roles_cache = {}
             role_refs_to_check = list(role_refs)
             ref_results = list(role_refs)
+            checked_role_refs = list()
             while(role_refs_to_check):
                 next_ref = role_refs_to_check.pop()
+                checked_role_refs.append(next_ref)
                 next_role_id = next_ref['role_id']
                 if next_role_id in implied_roles_cache:
                     implied_roles = implied_roles_cache[next_role_id]
@@ -625,15 +627,20 @@ class Manager(manager.Manager):
                     implied_ref = (
                         _make_implied_ref_copy(
                             next_ref, implied_role['implied_role_id']))
-                    ref_results.append(implied_ref)
-                    role_refs_to_check.append(implied_ref)
+                    if implied_ref in checked_role_refs:
+                        msg = _LE('Circular reference found '
+                                  'role inference rules - %(prior_role_id)s.')
+                        LOG.error(msg, {'prior_role_id': next_ref['role_id']})
+                    else:
+                        ref_results.append(implied_ref)
+                        role_refs_to_check.append(implied_ref)
         except exception.NotImplemented:
-            LOG.debug('Role driver does not support implied roles.')
+            LOG.error('Role driver does not support implied roles.')
 
         return ref_results
 
     def _filter_by_role_id(self, role_id, ref_results):
-        # if we arrive here, we  need to filer by role_id.
+        # if we arrive here, we need to filer by role_id.
         filter_results = []
         for ref in ref_results:
             if ref['role_id'] == role_id:
@@ -1545,7 +1552,12 @@ class RoleDriverV9(RoleDriverBase):
 
     @abc.abstractmethod
     def delete_implied_role(self, prior_role_id, implied_role_id):
-        """Deletes a role inference rule"""
+        """Deletes a role inference rule
+
+        :raises keystone.exception.ImpliedRoleNotFound: If the implied role
+            doesn't exist.
+
+        """
         raise exception.NotImplemented()  # pragma: no cover
 
     @abc.abstractmethod
@@ -1555,7 +1567,7 @@ class RoleDriverV9(RoleDriverBase):
 
     @abc.abstractmethod
     def list_implied_roles(self, prior_role_id):
-        """Lists roles implied from the prior role id"""
+        """Lists roles implied from the prior role ID"""
         raise exception.NotImplemented()  # pragma: no cover
 
 

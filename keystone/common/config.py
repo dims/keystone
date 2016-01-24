@@ -307,7 +307,7 @@ FILE_OPTIONS = {
                         'not be processed correctly.'),
         cfg.BoolOpt('infer_roles', default=True,
                     help='Add roles to token that are not explicitly added, '
-                    'but that are linked implicitly to other roles.'),
+                         'but that are linked implicitly to other roles.'),
     ],
     'revoke': [
         cfg.StrOpt('driver',
@@ -626,10 +626,25 @@ FILE_OPTIONS = {
                    help='LDAP attribute mapped to default_project_id for '
                         'users.'),
         cfg.BoolOpt('user_allow_create', default=True,
+                    deprecated_for_removal=True,
+                    deprecated_reason="Write support for Identity LDAP "
+                                      "backends has been deprecated in the M "
+                                      "release and will be removed in the O "
+                                      "release.",
                     help='Allow user creation in LDAP backend.'),
         cfg.BoolOpt('user_allow_update', default=True,
+                    deprecated_for_removal=True,
+                    deprecated_reason="Write support for Identity LDAP "
+                                      "backends has been deprecated in the M "
+                                      "release and will be removed in the O "
+                                      "release.",
                     help='Allow user updates in LDAP backend.'),
         cfg.BoolOpt('user_allow_delete', default=True,
+                    deprecated_for_removal=True,
+                    deprecated_reason="Write support for Identity LDAP "
+                                      "backends has been deprecated in the M "
+                                      "release and will be removed in the O "
+                                      "release.",
                     help='Allow user deletion in LDAP backend.'),
         cfg.BoolOpt('user_enabled_emulation', default=False,
                     help='If true, Keystone uses an alternative method to '
@@ -669,10 +684,25 @@ FILE_OPTIONS = {
                     help='List of attributes stripped off the group on '
                          'update.'),
         cfg.BoolOpt('group_allow_create', default=True,
+                    deprecated_for_removal=True,
+                    deprecated_reason="Write support for Identity LDAP "
+                                      "backends has been deprecated in the M "
+                                      "release and will be removed in the O "
+                                      "release.",
                     help='Allow group creation in LDAP backend.'),
         cfg.BoolOpt('group_allow_update', default=True,
+                    deprecated_for_removal=True,
+                    deprecated_reason="Write support for Identity LDAP "
+                                      "backends has been deprecated in the M "
+                                      "release and will be removed in the O "
+                                      "release.",
                     help='Allow group update in LDAP backend.'),
         cfg.BoolOpt('group_allow_delete', default=True,
+                    deprecated_for_removal=True,
+                    deprecated_reason="Write support for Identity LDAP "
+                                      "backends has been deprecated in the M "
+                                      "release and will be removed in the O "
+                                      "release.",
                     help='Allow group deletion in LDAP backend.'),
         cfg.ListOpt('group_additional_attribute_mapping',
                     default=[],
@@ -1042,7 +1072,6 @@ def set_default_for_default_log_levels():
     extra_log_level_defaults = [
         'dogpile=INFO',
         'routes=INFO',
-        'keystone.common._memcache_pool=INFO',
     ]
 
     log.register_options(CONF)

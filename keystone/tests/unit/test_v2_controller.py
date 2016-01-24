@@ -112,8 +112,7 @@ class TenantTestCase(unit.TestCase):
         self.assertRaises(
             exception.ProjectNotFound,
             self.tenant_controller.get_all_projects,
-            context
-        )
+            context)
 
         context = copy.deepcopy(_ADMIN_CONTEXT)
         context['query_string']['name'] = project['id']
@@ -121,8 +120,29 @@ class TenantTestCase(unit.TestCase):
         self.assertRaises(
             exception.ProjectNotFound,
             self.tenant_controller.get_all_projects,
-            context
-        )
+            context)
+
+    def test_create_is_domain_project_fails(self):
+        """Test that the creation of a project acting as a domain fails."""
+        project = {'name': uuid.uuid4().hex, 'domain_id': 'default',
+                   'is_domain': True}
+
+        self.assertRaises(
+            exception.ValidationError,
+            self.tenant_controller.create_project,
+            _ADMIN_CONTEXT,
+            project)
+
+    def test_create_project_passing_is_domain_false_fails(self):
+        """Test that passing is_domain=False is not allowed."""
+        project = {'name': uuid.uuid4().hex, 'domain_id': 'default',
+                   'is_domain': False}
+
+        self.assertRaises(
+            exception.ValidationError,
+            self.tenant_controller.create_project,
+            _ADMIN_CONTEXT,
+            project)
 
     def test_update_is_domain_project_not_found(self):
         """Test that update is_domain project is not allowed in v2."""
@@ -134,8 +154,7 @@ class TenantTestCase(unit.TestCase):
             self.tenant_controller.update_project,
             _ADMIN_CONTEXT,
             project['id'],
-            project
-        )
+            project)
 
     def test_delete_is_domain_project_not_found(self):
         """Test that delete is_domain project is not allowed in v2."""
@@ -145,8 +164,7 @@ class TenantTestCase(unit.TestCase):
             exception.ProjectNotFound,
             self.tenant_controller.delete_project,
             _ADMIN_CONTEXT,
-            project['id']
-        )
+            project['id'])
 
     def test_list_is_domain_project_not_found(self):
         """Test v2 get_all_projects having projects that act as a domain.
