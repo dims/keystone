@@ -964,8 +964,8 @@ class IdentityTests(AssignmentTestHelperMixin):
                 role_id=role_ref['id'])
 
         role_list = self.assignment_api.get_roles_for_user_and_project(
-            user_id=user_ref['id'],
-            tenant_id=project_ref['id'])
+            user_ref['id'],
+            project_ref['id'])
 
         self.assertEqual(set([r['id'] for r in role_ref_list]),
                          set(role_list))
@@ -3435,16 +3435,26 @@ class IdentityTests(AssignmentTestHelperMixin):
                           domain['id'])
 
     @unit.skip_if_no_multiple_domains_support
-    def test_create_domain_case_sensitivity(self):
+    def test_domain_name_case_sensitivity(self):
         # create a ref with a lowercase name
-        ref = unit.new_domain_ref(name=uuid.uuid4().hex.lower())
+        domain_name = 'test_domain'
+        ref = unit.new_domain_ref(name=domain_name)
 
-        self.resource_api.create_domain(ref['id'], ref)
+        lower_case_domain = self.resource_api.create_domain(ref['id'], ref)
 
-        # assign a new ID with the same name, but this time in uppercase
+        # assign a new ID to the ref with the same name, but in uppercase
         ref['id'] = uuid.uuid4().hex
-        ref['name'] = ref['name'].upper()
-        self.resource_api.create_domain(ref['id'], ref)
+        ref['name'] = domain_name.upper()
+        upper_case_domain = self.resource_api.create_domain(ref['id'], ref)
+
+        # We can get each domain by name
+        lower_case_domain_ref = self.resource_api.get_domain_by_name(
+            domain_name)
+        self.assertDictEqual(lower_case_domain, lower_case_domain_ref)
+
+        upper_case_domain_ref = self.resource_api.get_domain_by_name(
+            domain_name.upper())
+        self.assertDictEqual(upper_case_domain, upper_case_domain_ref)
 
     def test_attribute_update(self):
         project = unit.new_project_ref(domain_id=DEFAULT_DOMAIN_ID)

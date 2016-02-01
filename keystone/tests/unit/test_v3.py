@@ -29,6 +29,7 @@ from keystone.common.validation import validators
 from keystone import exception
 from keystone import middleware
 from keystone.policy.backends import rules
+from keystone.tests.common import auth as common_auth
 from keystone.tests import unit
 from keystone.tests.unit import rest
 
@@ -120,7 +121,127 @@ class AuthTestMixin(object):
 
 
 class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
-                      AuthTestMixin):
+                      common_auth.AuthTestMixin):
+
+    def generate_token_schema(self, domain_scoped=False, project_scoped=False):
+        """Return a dictionary of token properties to validate against."""
+        properties = {
+            'audit_ids': {
+                'type': 'array',
+                'items': {
+                    'type': 'string',
+                },
+                'minItems': 1,
+                'maxItems': 2,
+            },
+            'bind': {
+                'type': 'object',
+                'properties': {
+                    'kerberos': {
+                        'type': 'string',
+                    },
+                },
+                'required': ['kerberos'],
+                'additionalProperties': False,
+            },
+            'expires_at': {'type': 'string'},
+            'issued_at': {'type': 'string'},
+            'methods': {
+                'type': 'array',
+                'items': {
+                    'type': 'string',
+                },
+            },
+            'user': {
+                'type': 'object',
+                'required': ['id', 'name', 'domain'],
+                'properties': {
+                    'id': {'type': 'string'},
+                    'name': {'type': 'string'},
+                    'domain': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'name': {'type': 'string'}
+                        },
+                        'required': ['id', 'name'],
+                        'additonalProperties': False,
+                    }
+                },
+                'additionalProperties': False,
+            }
+        }
+
+        if domain_scoped:
+            properties['catalog'] = {'type': 'array'}
+            properties['roles'] = {
+                'type': 'array',
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'id': {'type': 'string', },
+                        'name': {'type': 'string', },
+                    },
+                    'required': ['id', 'name', ],
+                    'additionalProperties': False,
+                },
+                'minItems': 1,
+            }
+            properties['domain'] = {
+                'domain': {
+                    'type': 'object',
+                    'required': ['id', 'name'],
+                    'properties': {
+                        'id': {'type': 'string'},
+                        'name': {'type': 'string'}
+                    },
+                    'additionalProperties': False
+                }
+            }
+        elif project_scoped:
+            properties['is_admin_project'] = {'type': 'boolean'}
+            properties['catalog'] = {'type': 'array'}
+            properties['roles'] = {'type': 'array'}
+            properties['project'] = {
+                'type': ['object'],
+                'required': ['id', 'name', 'domain'],
+                'properties': {
+                    'id': {'type': 'string'},
+                    'name': {'type': 'string'},
+                    'domain': {
+                        'type': ['object'],
+                        'required': ['id', 'name'],
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'name': {'type': 'string'}
+                        },
+                        'additionalProperties': False
+                    }
+                },
+                'additionalProperties': False
+            }
+
+        schema = {
+            'type': 'object',
+            'properties': properties,
+            'required': ['audit_ids', 'expires_at', 'issued_at', 'methods',
+                         'user'],
+            'optional': ['bind'],
+            'additionalProperties': False
+        }
+
+        if domain_scoped:
+            schema['required'].extend(['domain', 'roles'])
+            schema['optional'].append('catalog')
+        elif project_scoped:
+            schema['required'].append('project')
+            schema['optional'].append('bind')
+            schema['optional'].append('catalog')
+            schema['optional'].append('OS-TRUST:trust')
+            schema['optional'].append('is_admin_project')
+
+        return schema
+
     def config_files(self):
         config_files = super(RestfulTestCase, self).config_files()
         config_files.append(unit.dirs.tests_conf('backend_sql.conf'))
@@ -534,62 +655,9 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
 
     def assertValidUnscopedTokenResponse(self, r, *args, **kwargs):
         token = self.assertValidTokenResponse(r, *args, **kwargs)
-
-        unscoped_properties = {
-            'audit_ids': {
-                'type': 'array',
-                'items': {
-                    'type': 'string',
-                },
-                'minItems': 1,
-                'maxItems': 2,
-            },
-            'bind': {
-                'type': 'object',
-                'properties': {
-                    'kerberos': {
-                        'type': 'string',
-                    },
-                },
-                'required': ['kerberos', ],
-                'additionalProperties': False,
-            },
-            'expires_at': {'type': 'string'},
-            'issued_at': {'type': 'string'},
-            'methods': {
-                'type': 'array',
-                'items': {
-                    'type': 'string',
-                },
-            },
-            'user': {
-                'type': 'object',
-                'required': ['id', 'name', 'domain'],
-                'properties': {
-                    'id': {'type': 'string'},
-                    'name': {'type': 'string'},
-                    'domain': {
-                        'type': 'object',
-                        'properties': {
-                            'id': {'type': 'string'},
-                            'name': {'type': 'string'}
-                        },
-                        'required': ['id', 'name'],
-                        'additonalProperties': False,
-                    }
-                },
-                'additionalProperties': False,
-            }
-        }
-        unscoped_token_schema = {
-            'type': 'object',
-            'properties': unscoped_properties,
-            'required': ['audit_ids', 'expires_at', 'issued_at', 'methods',
-                         'user'],
-            'optional': ['bind'],
-            'additionalProperties': False
-        }
-        validator_object = validators.SchemaValidator(unscoped_token_schema)
+        validator_object = validators.SchemaValidator(
+            self.generate_token_schema()
+        )
         validator_object.validate(token)
 
         return token
@@ -637,35 +705,55 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
     def assertValidProjectScopedTokenResponse(self, r, *args, **kwargs):
         token = self.assertValidScopedTokenResponse(r, *args, **kwargs)
 
-        self.assertIn('project', token)
-        self.assertIn('id', token['project'])
-        self.assertIn('name', token['project'])
-        self.assertIn('domain', token['project'])
-        self.assertIn('id', token['project']['domain'])
-        self.assertIn('name', token['project']['domain'])
+        project_scoped_token_schema = self.generate_token_schema(
+            project_scoped=True)
+
+        if token.get('OS-TRUST:trust'):
+            trust_properties = {
+                'OS-TRUST:trust': {
+                    'type': ['object'],
+                    'required': ['id', 'impersonation', 'trustor_user',
+                                 'trustee_user'],
+                    'properties': {
+                        'id': {'type': 'string'},
+                        'impersonation': {'type': 'boolean'},
+                        'trustor_user': {
+                            'type': 'object',
+                            'required': ['id'],
+                            'properties': {
+                                'id': {'type': 'string'}
+                            },
+                            'additionalProperties': False
+                        },
+                        'trustee_user': {
+                            'type': 'object',
+                            'required': ['id'],
+                            'properties': {
+                                'id': {'type': 'string'}
+                            },
+                            'additionalProperties': False
+                        }
+                    },
+                    'additionalProperties': False
+                }
+            }
+            project_scoped_token_schema['properties'].update(trust_properties)
+
+        validator_object = validators.SchemaValidator(
+            project_scoped_token_schema)
+        validator_object.validate(token)
 
         self.assertEqual(self.role_id, token['roles'][0]['id'])
 
         return token
 
-    def assertValidProjectTrustScopedTokenResponse(self, r, *args, **kwargs):
-        token = self.assertValidProjectScopedTokenResponse(r, *args, **kwargs)
-
-        trust = token.get('OS-TRUST:trust')
-        self.assertIsNotNone(trust)
-        self.assertIsNotNone(trust.get('id'))
-        self.assertIsInstance(trust.get('impersonation'), bool)
-        self.assertIsNotNone(trust.get('trustor_user'))
-        self.assertIsNotNone(trust.get('trustee_user'))
-        self.assertIsNotNone(trust['trustor_user'].get('id'))
-        self.assertIsNotNone(trust['trustee_user'].get('id'))
-
     def assertValidDomainScopedTokenResponse(self, r, *args, **kwargs):
         token = self.assertValidScopedTokenResponse(r, *args, **kwargs)
 
-        self.assertIn('domain', token)
-        self.assertIn('id', token['domain'])
-        self.assertIn('name', token['domain'])
+        validator_object = validators.SchemaValidator(
+            self.generate_token_schema(domain_scoped=True)
+        )
+        validator_object.validate(token)
 
         return token
 

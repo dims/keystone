@@ -23,6 +23,7 @@ import socket
 from oslo_config import cfg
 from oslo_log import log
 import oslo_messaging
+from oslo_utils import reflection
 import pycadf
 from pycadf import cadftaxonomy as taxonomy
 from pycadf import cadftype
@@ -31,6 +32,7 @@ from pycadf import eventfactory
 from pycadf import resource
 
 from keystone.i18n import _, _LE
+from keystone.common import utils
 
 
 notifier_opts = [
@@ -253,7 +255,8 @@ def _get_callback_info(callback):
     module_name = getattr(callback, '__module__', None)
     func_name = callback.__name__
     if inspect.ismethod(callback):
-        class_name = callback.__self__.__class__.__name__
+        class_name = reflection.get_class_name(callback.__self__,
+                                               fully_qualified=False)
         return [module_name, class_name, func_name]
     else:
         return [module_name, func_name]
@@ -501,8 +504,12 @@ def _get_request_audit_info(context, user_id=None):
                                     {}).get('domain_id')
 
     host = pycadf.host.Host(address=remote_addr, agent=http_user_agent)
-    initiator = resource.Resource(typeURI=taxonomy.ACCOUNT_USER,
-                                  id=user_id, host=host)
+    initiator = resource.Resource(typeURI=taxonomy.ACCOUNT_USER, host=host)
+
+    if user_id:
+        initiator.user_id = user_id
+        initiator.id = utils.resource_uuid(user_id)
+
     if project_id:
         initiator.project_id = project_id
     if domain_id:

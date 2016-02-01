@@ -22,10 +22,12 @@ import grp
 import hashlib
 import os
 import pwd
+import uuid
 
 from oslo_config import cfg
 from oslo_log import log
 from oslo_serialization import jsonutils
+from oslo_utils import reflection
 from oslo_utils import strutils
 from oslo_utils import timeutils
 import passlib.hash
@@ -40,6 +42,24 @@ from keystone.i18n import _, _LE, _LW
 CONF = cfg.CONF
 
 LOG = log.getLogger(__name__)
+
+
+# NOTE(stevermar): This UUID must stay the same, forever, across
+# all of keystone to preserve its value as a URN namespace, which is
+# used for ID transformation.
+RESOURCE_ID_NAMESPACE = uuid.UUID('4332ecab-770b-4288-a680-b9aca3b1b153')
+
+
+def resource_uuid(value):
+    """Converts input to valid UUID hex digits."""
+    try:
+        uuid.UUID(value)
+        return value
+    except ValueError:
+        if len(value) <= 64:
+            return uuid.uuid5(RESOURCE_ID_NAMESPACE, value).hex
+        raise ValueError(_('Length of transformable resource id > 64, '
+                         'which is max allowed characters'))
 
 
 def flatten_dict(d, parent_key=''):
@@ -296,8 +316,10 @@ def get_unix_user(user=None):
     elif user is None:
         user_info = pwd.getpwuid(os.geteuid())
     else:
+        user_cls_name = reflection.get_class_name(user,
+                                                  fully_qualified=False)
         raise TypeError('user must be string, int or None; not %s (%r)' %
-                        (user.__class__.__name__, user))
+                        (user_cls_name, user))
 
     return user_info.pw_uid, user_info.pw_name
 
@@ -354,8 +376,10 @@ def get_unix_group(group=None):
     elif group is None:
         group_info = grp.getgrgid(os.getegid())
     else:
+        group_cls_name = reflection.get_class_name(group,
+                                                   fully_qualified=False)
         raise TypeError('group must be string, int or None; not %s (%r)' %
-                        (group.__class__.__name__, group))
+                        (group_cls_name, group))
 
     return group_info.gr_gid, group_info.gr_name
 

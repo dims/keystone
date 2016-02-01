@@ -424,7 +424,8 @@ def new_policy_ref(**kwargs):
 def new_trust_ref(trustor_user_id, trustee_user_id, project_id=None,
                   impersonation=None, expires=None, role_ids=None,
                   role_names=None, remaining_uses=None,
-                  allow_redelegation=False, **kwargs):
+                  allow_redelegation=False, redelegation_count=None,
+                  redelegated_trust_id=None, **kwargs):
     ref = {
         'id': uuid.uuid4().hex,
         'trustor_user_id': trustor_user_id,
@@ -433,7 +434,11 @@ def new_trust_ref(trustor_user_id, trustee_user_id, project_id=None,
         'project_id': project_id,
         'remaining_uses': remaining_uses,
         'allow_redelegation': allow_redelegation,
+        'redelegated_trust_id': redelegated_trust_id,
     }
+
+    if isinstance(redelegation_count, int):
+        ref.update(redelegation_count=redelegation_count)
 
     if isinstance(expires, six.string_types):
         ref['expires_at'] = expires
@@ -541,7 +546,6 @@ class TestCase(BaseTestCase):
                 ('keystone.tests.unit.test_kvs.'
                  'KVSBackendForcedKeyMangleFixture'),
                 'keystone.tests.unit.test_kvs.KVSBackendFixture'])
-        self.config_fixture.config(group='revoke', driver='kvs')
         self.config_fixture.config(
             group='signing', certfile=signing_certfile,
             keyfile=signing_keyfile,
@@ -568,11 +572,10 @@ class TestCase(BaseTestCase):
         self.auth_plugin_config_override()
 
     def auth_plugin_config_override(self, methods=None, **method_classes):
-        if methods is not None:
-            self.config_fixture.config(group='auth', methods=methods)
-            config.setup_authentication()
-        if method_classes:
-            self.config_fixture.config(group='auth', **method_classes)
+        self.useFixture(
+            ksfixtures.ConfigAuthPlugins(self.config_fixture,
+                                         methods,
+                                         **method_classes))
 
     def _assert_config_overrides_called(self):
         assert self.__config_overrides_called is True
@@ -580,6 +583,7 @@ class TestCase(BaseTestCase):
     def setUp(self):
         super(TestCase, self).setUp()
         self.__config_overrides_called = False
+        self.__load_backends_called = False
         self.addCleanup(CONF.reset)
         self.config_fixture = self.useFixture(config_fixture.Config(CONF))
         self.addCleanup(delattr, self, 'config_fixture')
@@ -835,7 +839,6 @@ class SQLDriverOverrides(object):
         self.config_fixture.config(group='catalog', driver='sql')
         self.config_fixture.config(group='identity', driver='sql')
         self.config_fixture.config(group='policy', driver='sql')
-        self.config_fixture.config(group='revoke', driver='sql')
         self.config_fixture.config(group='token', driver='sql')
         self.config_fixture.config(group='trust', driver='sql')
 

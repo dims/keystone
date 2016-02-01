@@ -33,6 +33,7 @@ from keystone.common import utils
 from keystone.contrib.revoke import routers
 from keystone import exception
 from keystone.policy.backends import rules
+from keystone.tests.common import auth as common_auth
 from keystone.tests import unit
 from keystone.tests.unit import ksfixtures
 from keystone.tests.unit import test_v3
@@ -40,7 +41,7 @@ from keystone.tests.unit import test_v3
 CONF = cfg.CONF
 
 
-class TestAuthInfo(test_v3.AuthTestMixin, testcase.TestCase):
+class TestAuthInfo(common_auth.AuthTestMixin, testcase.TestCase):
     def setUp(self):
         super(TestAuthInfo, self).setUp()
         auth.controllers.load_auth_methods()
@@ -489,6 +490,84 @@ class TokenDataTests(object):
         r = self.get('/auth/tokens', headers=self.headers)
         self.assertValidUnscopedTokenResponse(r)
 
+    def test_domain_scoped_token_format(self):
+        # ensure the domain scoped token response contains the appropriate data
+        self.assignment_api.create_grant(
+            self.role['id'],
+            user_id=self.default_domain_user['id'],
+            domain_id=self.domain['id'])
+
+        domain_scoped_token = self.get_requested_token(
+            self.build_authentication_request(
+                user_id=self.default_domain_user['id'],
+                password=self.default_domain_user['password'],
+                domain_id=self.domain['id'])
+        )
+        self.headers['X-Subject-Token'] = domain_scoped_token
+        r = self.get('/auth/tokens', headers=self.headers)
+        self.assertValidDomainScopedTokenResponse(r)
+
+    def test_project_scoped_token_format(self):
+        # ensure project scoped token responses contains the appropriate data
+        project_scoped_token = self.get_requested_token(
+            self.build_authentication_request(
+                user_id=self.default_domain_user['id'],
+                password=self.default_domain_user['password'],
+                project_id=self.default_domain_project['id'])
+        )
+        self.headers['X-Subject-Token'] = project_scoped_token
+        r = self.get('/auth/tokens', headers=self.headers)
+        self.assertValidProjectScopedTokenResponse(r)
+
+    def test_extra_data_in_unscoped_token_fails_validation(self):
+        # ensure unscoped token response contains the appropriate data
+        r = self.get('/auth/tokens', headers=self.headers)
+
+        # populate the response result with some extra data
+        r.result['token'][u'extra'] = unicode(uuid.uuid4().hex)
+        self.assertRaises(exception.SchemaValidationError,
+                          self.assertValidUnscopedTokenResponse,
+                          r)
+
+    def test_extra_data_in_domain_scoped_token_fails_validation(self):
+        # ensure domain scoped token response contains the appropriate data
+        self.assignment_api.create_grant(
+            self.role['id'],
+            user_id=self.default_domain_user['id'],
+            domain_id=self.domain['id'])
+
+        domain_scoped_token = self.get_requested_token(
+            self.build_authentication_request(
+                user_id=self.default_domain_user['id'],
+                password=self.default_domain_user['password'],
+                domain_id=self.domain['id'])
+        )
+        self.headers['X-Subject-Token'] = domain_scoped_token
+        r = self.get('/auth/tokens', headers=self.headers)
+
+        # populate the response result with some extra data
+        r.result['token'][u'extra'] = unicode(uuid.uuid4().hex)
+        self.assertRaises(exception.SchemaValidationError,
+                          self.assertValidDomainScopedTokenResponse,
+                          r)
+
+    def test_extra_data_in_project_scoped_token_fails_validation(self):
+        # ensure project scoped token responses contains the appropriate data
+        project_scoped_token = self.get_requested_token(
+            self.build_authentication_request(
+                user_id=self.default_domain_user['id'],
+                password=self.default_domain_user['password'],
+                project_id=self.default_domain_project['id'])
+        )
+        self.headers['X-Subject-Token'] = project_scoped_token
+        resp = self.get('/auth/tokens', headers=self.headers)
+
+        # populate the response result with some extra data
+        resp.result['token'][u'extra'] = unicode(uuid.uuid4().hex)
+        self.assertRaises(exception.SchemaValidationError,
+                          self.assertValidProjectScopedTokenResponse,
+                          resp)
+
 
 class AllowRescopeScopedTokenDisabledTests(test_v3.RestfulTestCase):
     def config_overrides(self):
@@ -816,7 +895,6 @@ class TestTokenRevokeById(test_v3.RestfulTestCase):
 
     def config_overrides(self):
         super(TestTokenRevokeById, self).config_overrides()
-        self.config_fixture.config(group='revoke', driver='kvs')
         self.config_fixture.config(
             group='token',
             provider='pki',
@@ -1503,9 +1581,6 @@ class TestTokenRevokeByAssignment(TestTokenRevokeById):
     def config_overrides(self):
         super(TestTokenRevokeById, self).config_overrides()
         self.config_fixture.config(
-            group='revoke',
-            driver='kvs')
-        self.config_fixture.config(
             group='token',
             provider='uuid',
             revoke_by_id=True)
@@ -1565,7 +1640,6 @@ class TestTokenRevokeApi(TestTokenRevokeById):
 
     def config_overrides(self):
         super(TestTokenRevokeApi, self).config_overrides()
-        self.config_fixture.config(group='revoke', driver='kvs')
         self.config_fixture.config(
             group='token',
             provider='pki',
@@ -3170,27 +3244,43 @@ class TestTrustChain(test_v3.RestfulTestCase):
 
     def setUp(self):
         super(TestTrustChain, self).setUp()
-        # Create trust chain
-        self.user_chain = list()
+        """Create a trust chain using redelegation.
+
+        A trust chain is a series of trusts that are redelegated. For example,
+        self.user_list consists of userA, userB, and userC. The first trust in
+        the trust chain is going to be established between self.user and userA,
+        call it trustA. Then, userA is going to obtain a trust scoped token
+        using trustA, and with that token create a trust between userA and
+        userB called trustB. This pattern will continue with userB creating a
+        trust with userC.
+        So the trust chain should look something like:
+            trustA -> trustB -> trustC
+        Where:
+            self.user is trusting userA with trustA
+            userA is trusting userB with trustB
+            userB is trusting userC with trustC
+
+        """
+        self.user_list = list()
         self.trust_chain = list()
         for _ in range(3):
             user = unit.create_user(self.identity_api,
                                     domain_id=self.domain_id)
-            self.user_chain.append(user)
+            self.user_list.append(user)
 
-        # trustor->trustee
-        trustee = self.user_chain[0]
+        # trustor->trustee redelegation without impersonation
+        trustee = self.user_list[0]
         trust_ref = unit.new_trust_ref(
             trustor_user_id=self.user_id,
             trustee_user_id=trustee['id'],
             project_id=self.project_id,
-            impersonation=True,
+            impersonation=False,
             expires=dict(minutes=1),
-            role_ids=[self.role_id])
-        trust_ref.update(
+            role_ids=[self.role_id],
             allow_redelegation=True,
             redelegation_count=3)
 
+        # Create a trust between self.user and the first user in the list
         r = self.post('/OS-TRUST/trusts',
                       body={'trust': trust_ref})
 
@@ -3199,30 +3289,39 @@ class TestTrustChain(test_v3.RestfulTestCase):
             user_id=trustee['id'],
             password=trustee['password'],
             trust_id=trust['id'])
+
+        # Generate a trusted token for the first user
         trust_token = self.get_requested_token(auth_data)
         self.trust_chain.append(trust)
 
-        for trustee in self.user_chain[1:]:
+        # Set trustor and redelegated_trust_id for next trust in the chain
+        next_trustor_id = trustee['id']
+        redelegated_trust_id = trust['id']
+
+        # Loop through the user to create a chain of redelegated trust.
+        for next_trustee in self.user_list[1:]:
             trust_ref = unit.new_trust_ref(
-                trustor_user_id=self.user_id,
-                trustee_user_id=trustee['id'],
+                trustor_user_id=next_trustor_id,
+                trustee_user_id=next_trustee['id'],
                 project_id=self.project_id,
-                impersonation=True,
-                role_ids=[self.role_id])
-            trust_ref.update(
-                allow_redelegation=True)
+                impersonation=False,
+                role_ids=[self.role_id],
+                allow_redelegation=True,
+                redelegated_trust_id=redelegated_trust_id)
             r = self.post('/OS-TRUST/trusts',
                           body={'trust': trust_ref},
                           token=trust_token)
             trust = self.assertValidTrustResponse(r)
             auth_data = self.build_authentication_request(
-                user_id=trustee['id'],
-                password=trustee['password'],
+                user_id=next_trustee['id'],
+                password=next_trustee['password'],
                 trust_id=trust['id'])
             trust_token = self.get_requested_token(auth_data)
             self.trust_chain.append(trust)
+            next_trustor_id = next_trustee['id']
+            redelegated_trust_id = trust['id']
 
-        trustee = self.user_chain[-1]
+        trustee = self.user_list[-1]
         trust = self.trust_chain[-1]
         auth_data = self.build_authentication_request(
             user_id=trustee['id'],
@@ -3240,7 +3339,7 @@ class TestTrustChain(test_v3.RestfulTestCase):
         self.assertValidTokenResponse(r)
 
     def assert_trust_tokens_revoked(self, trust_id):
-        trustee = self.user_chain[0]
+        trustee = self.user_list[0]
         auth_data = self.build_authentication_request(
             user_id=trustee['id'],
             password=trustee['password']
@@ -3258,7 +3357,7 @@ class TestTrustChain(test_v3.RestfulTestCase):
                         trust_id)
 
     def test_delete_trust_cascade(self):
-        self.assert_user_authenticate(self.user_chain[0])
+        self.assert_user_authenticate(self.user_list[0])
         self.delete('/OS-TRUST/trusts/%(trust_id)s' % {
             'trust_id': self.trust_chain[0]['id']})
 
@@ -3268,30 +3367,51 @@ class TestTrustChain(test_v3.RestfulTestCase):
         self.assert_trust_tokens_revoked(self.trust_chain[0]['id'])
 
     def test_delete_broken_chain(self):
-        self.assert_user_authenticate(self.user_chain[0])
-        self.delete('/OS-TRUST/trusts/%(trust_id)s' % {
-            'trust_id': self.trust_chain[1]['id']})
-
+        self.assert_user_authenticate(self.user_list[0])
         self.delete('/OS-TRUST/trusts/%(trust_id)s' % {
             'trust_id': self.trust_chain[0]['id']})
 
+        # Verify the two remaining trust have been deleted
+        for i in xrange(len(self.user_list) - 1):
+            auth_data = self.build_authentication_request(
+                user_id=self.user_list[i]['id'],
+                password=self.user_list[i]['password'])
+
+            auth_token = self.get_requested_token(auth_data)
+
+            self.delete('/OS-TRUST/trusts/%(trust_id)s' % {
+                'trust_id': self.trust_chain[i + 1]['id']},
+                token=auth_token,
+                expected_status=http_client.NOT_FOUND)
+
     def test_trustor_roles_revoked(self):
-        self.assert_user_authenticate(self.user_chain[0])
+        self.assert_user_authenticate(self.user_list[0])
 
         self.assignment_api.remove_role_from_user_and_project(
             self.user_id, self.project_id, self.role_id
         )
 
-        auth_data = self.build_authentication_request(
-            token=self.last_token,
-            trust_id=self.trust_chain[-1]['id'])
-        self.v3_create_token(auth_data,
-                             expected_status=http_client.NOT_FOUND)
+        # Verify that users are not allowed to authenticate with trust
+        for i in xrange(len(self.user_list[1:])):
+            trustee = self.user_list[i]
+            auth_data = self.build_authentication_request(
+                user_id=trustee['id'],
+                password=trustee['password'])
+
+            # Attempt to authenticate with trust
+            token = self.get_requested_token(auth_data)
+            auth_data = self.build_authentication_request(
+                token=token,
+                trust_id=self.trust_chain[i - 1]['id'])
+
+            # Trustee has no delegated roles
+            self.v3_create_token(auth_data,
+                                 expected_status=http_client.FORBIDDEN)
 
     def test_intermediate_user_disabled(self):
-        self.assert_user_authenticate(self.user_chain[0])
+        self.assert_user_authenticate(self.user_list[0])
 
-        disabled = self.user_chain[0]
+        disabled = self.user_list[0]
         disabled['enabled'] = False
         self.identity_api.update_user(disabled['id'], disabled)
 
@@ -3302,9 +3422,9 @@ class TestTrustChain(test_v3.RestfulTestCase):
                       expected_status=http_client.FORBIDDEN)
 
     def test_intermediate_user_deleted(self):
-        self.assert_user_authenticate(self.user_chain[0])
+        self.assert_user_authenticate(self.user_list[0])
 
-        self.identity_api.delete_user(self.user_chain[0]['id'])
+        self.identity_api.delete_user(self.user_list[0]['id'])
 
         # Bypass policy enforcement
         with mock.patch.object(rules, 'enforce', return_value=True):
@@ -3317,7 +3437,6 @@ class TestTrustAuth(test_v3.RestfulTestCase):
 
     def config_overrides(self):
         super(TestTrustAuth, self).config_overrides()
-        self.config_fixture.config(group='revoke', driver='kvs')
         self.config_fixture.config(
             group='token',
             provider='pki',
@@ -3590,7 +3709,7 @@ class TestTrustAuth(test_v3.RestfulTestCase):
             password=self.trustee_user['password'],
             trust_id=trust_id)
         r = self.v3_create_token(auth_data)
-        self.assertValidProjectTrustScopedTokenResponse(
+        self.assertValidProjectScopedTokenResponse(
             r, self.trustee_user)
         trust_token = r.headers['X-Subject-Token']
         self.delete('/OS-TRUST/trusts/%(trust_id)s' % {
@@ -3701,7 +3820,7 @@ class TestTrustAuth(test_v3.RestfulTestCase):
             trust_id=trust['id'])
         r = self.v3_create_token(auth_data)
 
-        self.assertValidProjectTrustScopedTokenResponse(r, self.user)
+        self.assertValidProjectScopedTokenResponse(r, self.user)
         trust_token = r.headers.get('X-Subject-Token')
 
         self.get('/OS-TRUST/trusts?trustor_user_id=%s' %
