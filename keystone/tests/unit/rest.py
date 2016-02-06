@@ -17,6 +17,7 @@ from six.moves import http_client
 import webtest
 
 from keystone.auth import controllers as auth_controllers
+from keystone.policy.backends import rules
 from keystone.tests import unit
 from keystone.tests.unit import default_fixtures
 from keystone.tests.unit.ksfixtures import database
@@ -71,6 +72,12 @@ class RestfulTestCase(unit.TestCase):
         self.admin_app = webtest.TestApp(
             self.loadapp(app_conf, name='admin'))
         self.addCleanup(delattr, self, 'admin_app')
+        # Initialize the policy engine and allow us to write to a temp
+        # file in each test to create the policies
+        rules.reset()
+
+        # drop the policy rules
+        self.addCleanup(rules.reset)
 
     def request(self, app, path, body=None, headers=None, token=None,
                 expected_status=None, **kwargs):
@@ -145,7 +152,11 @@ class RestfulTestCase(unit.TestCase):
             headers['Accept'] = 'application/json'
             if body:
                 headers['Content-Type'] = 'application/json'
-                return jsonutils.dumps(body)
+                # NOTE(davechen):dump the body to bytes since WSGI requires
+                # the body of the response to be `Bytestrings`.
+                # see pep-3333:
+                # https://www.python.org/dev/peps/pep-3333/#a-note-on-string-types
+                return jsonutils.dump_as_bytes(body)
 
     def _from_content_type(self, response, content_type=None):
         """Attempt to decode JSON and XML automatically, if detected."""

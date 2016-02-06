@@ -347,26 +347,33 @@ FILE_OPTIONS = {
     'signing': [
         cfg.StrOpt('certfile',
                    default=_CERTFILE,
+                   deprecated_for_removal=True,
                    help='Path of the certfile for token signing. For '
                         'non-production environments, you may be interested '
                         'in using `keystone-manage pki_setup` to generate '
                         'self-signed certificates.'),
         cfg.StrOpt('keyfile',
                    default=_KEYFILE,
+                   deprecated_for_removal=True,
                    help='Path of the keyfile for token signing.'),
         cfg.StrOpt('ca_certs',
+                   deprecated_for_removal=True,
                    default='/etc/keystone/ssl/certs/ca.pem',
                    help='Path of the CA for token signing.'),
         cfg.StrOpt('ca_key',
                    default='/etc/keystone/ssl/private/cakey.pem',
+                   deprecated_for_removal=True,
                    help='Path of the CA key for token signing.'),
         cfg.IntOpt('key_size', default=2048, min=1024,
+                   deprecated_for_removal=True,
                    help='Key size (in bits) for token signing cert '
                         '(auto generated certificate).'),
         cfg.IntOpt('valid_days', default=3650,
+                   deprecated_for_removal=True,
                    help='Days the token signing cert is valid for '
                         '(auto generated certificate).'),
         cfg.StrOpt('cert_subject',
+                   deprecated_for_removal=True,
                    default=('/C=US/ST=Unset/L=Unset/O=Unset/'
                             'CN=www.example.com'),
                    help='Certificate subject (auto generated certificate) for '
@@ -378,6 +385,11 @@ FILE_OPTIONS = {
                         'keystone.assignment namespace. Only an SQL driver is '
                         'supplied.',
                    default='sql'),
+        cfg.StrOpt('root_role', default='admin',
+                   help='A role that is not allowed to be an implied '
+                   'role, as it is the root of role inference directed '
+                   'acyclic graph.'),
+
     ],
     'resource': [
         cfg.StrOpt('driver',
@@ -1075,8 +1087,8 @@ def set_default_for_default_log_levels():
     ]
 
     log.register_options(CONF)
-    CONF.set_default('default_log_levels',
-                     CONF.default_log_levels + extra_log_level_defaults)
+    log.set_defaults(default_log_levels=log.get_default_log_levels() +
+                     extra_log_level_defaults)
 
 
 def setup_logging():
