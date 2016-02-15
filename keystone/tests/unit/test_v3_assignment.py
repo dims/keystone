@@ -20,6 +20,7 @@ from testtools import matchers
 
 from keystone.tests import unit
 from keystone.tests.unit import test_v3
+from keystone.tests.unit import utils
 
 
 CONF = cfg.CONF
@@ -2568,12 +2569,150 @@ class ImpliedRolesTests(test_v3.RestfulTestCase, test_v3.AssignmentTestMixin,
         self._assert_effective_role_for_implied_has_prior_in_links(
             response, user, project, 1, 2)
 
-    def test_root_role_as_implied_role_forbidden(self):
-        self.config_fixture.config(group='assignment', root_role='root')
+    def _create_named_role(self, name):
+        role = unit.new_role_ref()
+        role['name'] = name
+        self.role_api.create_role(role['id'], role)
+        return role
 
-        root_role = unit.new_role_ref()
-        root_role['name'] = 'root'
-        self.role_api.create_role(root_role['id'], root_role)
-        prior = self._create_role()
-        url = '/roles/%s/implies/%s' % (prior['id'], root_role['id'])
+    def test_root_role_as_implied_role_forbidden(self):
+        """Create 2 roles that are prohibited from being an implied role.
+        Create 1 additional role which should be accepted as an implied
+        role. Assure the prohibited role names cannot be set as an implied
+        role. Assure the accepted role name which is not a member of the
+        prohibited implied role list can be successfully set an implied
+        role.
+        """
+        prohibited_name1 = 'root1'
+        prohibited_name2 = 'root2'
+        accepted_name1 = 'implied1'
+
+        prohibited_names = [prohibited_name1, prohibited_name2]
+        self.config_fixture.config(group='assignment',
+                                   prohibited_implied_role=prohibited_names)
+
+        prior_role = self._create_role()
+
+        prohibited_role1 = self._create_named_role(prohibited_name1)
+        url = '/roles/{prior_role_id}/implies/{implied_role_id}'.format(
+            prior_role_id=prior_role['id'],
+            implied_role_id=prohibited_role1['id'])
         self.put(url, expected_status=http_client.FORBIDDEN)
+
+        prohibited_role2 = self._create_named_role(prohibited_name2)
+        url = '/roles/{prior_role_id}/implies/{implied_role_id}'.format(
+            prior_role_id=prior_role['id'],
+            implied_role_id=prohibited_role2['id'])
+        self.put(url, expected_status=http_client.FORBIDDEN)
+
+        accepted_role1 = self._create_named_role(accepted_name1)
+        url = '/roles/{prior_role_id}/implies/{implied_role_id}'.format(
+            prior_role_id=prior_role['id'],
+            implied_role_id=accepted_role1['id'])
+        self.put(url, expected_status=http_client.CREATED)
+
+    @utils.wip('This will fail because of bug #1543318.')
+    def test_trusts_from_implied_role(self):
+        self._create_three_roles()
+        self._create_implied_role(self.role_list[0], self.role_list[1])
+        self._create_implied_role(self.role_list[1], self.role_list[2])
+        self._assign_top_role_to_user_on_project(self.user, self.project)
+
+        # Create a trustee and assign the prior role to her
+        trustee = unit.create_user(self.identity_api, domain_id=self.domain_id)
+        ref = unit.new_trust_ref(
+            trustor_user_id=self.user['id'],
+            trustee_user_id=trustee['id'],
+            project_id=self.project['id'],
+            role_ids=[self.role_list[0]['id']])
+        r = self.post('/OS-TRUST/trusts', body={'trust': ref})
+        trust = r.result['trust']
+
+        # Only the role that was specified is in the trust, NOT implied roles
+        self.assertEqual(self.role_list[0]['id'], trust['roles'][0]['id'])
+        self.assertThat(trust['roles'], matchers.HasLength(1))
+
+        # Authenticate as the trustee
+        auth_data = self.build_authentication_request(
+            user_id=trustee['id'],
+            password=trustee['password'],
+            trust_id=trust['id'])
+        r = self.v3_create_token(auth_data)
+        token = r.result['token']
+
+        # FIXME(stevemar): See bug 1543318: Only one role appears in the
+        # token, it should have all the implied roles (3).
+        self.assertThat(token['roles'],
+                        matchers.HasLength(len(self.role_list)))
+
+
+class DomainSpecificRoleTests(test_v3.RestfulTestCase, unit.TestCase):
+    def setUp(self):
+        def create_role(domain_id=None):
+            """Call ``POST /roles``."""
+            ref = unit.new_role_ref(domain_id=domain_id)
+            r = self.post(
+                '/roles',
+                body={'role': ref})
+            return self.assertValidRoleResponse(r, ref)
+
+        super(DomainSpecificRoleTests, self).setUp()
+        self.domainA = unit.new_domain_ref()
+        self.resource_api.create_domain(self.domainA['id'], self.domainA)
+        self.domainB = unit.new_domain_ref()
+        self.resource_api.create_domain(self.domainB['id'], self.domainB)
+
+        self.global_role1 = create_role()
+        self.global_role2 = create_role()
+        # Since there maybe other global roles already created, let's count
+        # them, so we can ensure we can check subsequent list responses
+        # are correct
+        r = self.get('/roles')
+        self.existing_global_roles = len(r.result['roles'])
+
+        # And now create some domain specific roles
+        self.domainA_role1 = create_role(domain_id=self.domainA['id'])
+        self.domainA_role2 = create_role(domain_id=self.domainA['id'])
+        self.domainB_role = create_role(domain_id=self.domainB['id'])
+
+    def test_get_and_list_domain_specific_roles(self):
+        # Check we can get a domain specific role
+        r = self.get('/roles/%s' % self.domainA_role1['id'])
+        self.assertValidRoleResponse(r, self.domainA_role1)
+
+        # If we list without specifying a domain, we should only get global
+        # roles back.
+        r = self.get('/roles')
+        self.assertValidRoleListResponse(
+            r, expected_length=self.existing_global_roles)
+        self.assertRoleInListResponse(r, self.global_role1)
+        self.assertRoleInListResponse(r, self.global_role2)
+        self.assertRoleNotInListResponse(r, self.domainA_role1)
+        self.assertRoleNotInListResponse(r, self.domainA_role2)
+        self.assertRoleNotInListResponse(r, self.domainB_role)
+
+        # Now list those in domainA, making sure that's all we get back
+        r = self.get('/roles?domain_id=%s' % self.domainA['id'])
+        self.assertValidRoleListResponse(r, expected_length=2)
+        self.assertRoleInListResponse(r, self.domainA_role1)
+        self.assertRoleInListResponse(r, self.domainA_role2)
+
+    def test_update_domain_specific_roles(self):
+        self.domainA_role1['name'] = uuid.uuid4().hex
+        self.patch('/roles/%(role_id)s' % {
+            'role_id': self.domainA_role1['id']},
+            body={'role': self.domainA_role1})
+        r = self.get('/roles/%s' % self.domainA_role1['id'])
+        self.assertValidRoleResponse(r, self.domainA_role1)
+
+    def test_delete_domain_specific_roles(self):
+        # Check delete only removes that one domain role
+        self.delete('/roles/%(role_id)s' % {
+            'role_id': self.domainA_role1['id']})
+
+        self.get('/roles/%s' % self.domainA_role1['id'],
+                 expected_status=http_client.NOT_FOUND)
+        # Now re-list those in domainA, making sure there's only one left
+        r = self.get('/roles?domain_id=%s' % self.domainA['id'])
+        self.assertValidRoleListResponse(r, expected_length=1)
+        self.assertRoleInListResponse(r, self.domainA_role2)

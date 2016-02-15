@@ -2524,7 +2524,8 @@ class IdentityTests(AssignmentTestHelperMixin):
 
     def _create_projects_hierarchy(self, hierarchy_size=2,
                                    domain_id=DEFAULT_DOMAIN_ID,
-                                   is_domain=False):
+                                   is_domain=False,
+                                   parent_project_id=None):
         """Creates a project hierarchy with specified size.
 
         :param hierarchy_size: the desired hierarchy size, default is 2 -
@@ -2532,12 +2533,20 @@ class IdentityTests(AssignmentTestHelperMixin):
         :param domain_id: domain where the projects hierarchy will be created.
         :param is_domain: if the hierarchy will have the is_domain flag active
                           or not.
+        :param parent_project_id: if the intention is to create a
+            sub-hierarchy, sets the sub-hierarchy root. Defaults to creating
+            a new hierarchy, i.e. a new root project.
 
         :returns projects: a list of the projects in the created hierarchy.
 
         """
-        project = unit.new_project_ref(domain_id=domain_id,
-                                       is_domain=is_domain)
+        if parent_project_id:
+            project = unit.new_project_ref(parent_id=parent_project_id,
+                                           domain_id=domain_id,
+                                           is_domain=is_domain)
+        else:
+            project = unit.new_project_ref(domain_id=domain_id,
+                                           is_domain=is_domain)
         project_id = project['id']
         self.resource_api.create_project(project_id, project)
 
@@ -3306,6 +3315,132 @@ class IdentityTests(AssignmentTestHelperMixin):
         self.assertRaises(exception.ProjectNotFound,
                           self.resource_api.get_project,
                           leaf_project['id'])
+
+    def test_delete_projects_from_ids(self):
+        """Tests the resource backend call delete_projects_from_ids
+        Tests the normal flow of the delete_projects_from_ids backend call,
+        that ensures no project on the list exists after it is succesfully
+        called.
+        """
+        project1_ref = unit.new_project_ref(domain_id=DEFAULT_DOMAIN_ID)
+        project2_ref = unit.new_project_ref(domain_id=DEFAULT_DOMAIN_ID)
+        projects = (project1_ref, project2_ref)
+        for project in projects:
+            self.resource_api.create_project(project['id'], project)
+
+        # Setting up the ID's list
+        projects_ids = [p['id'] for p in projects]
+        self.resource_api.driver.delete_projects_from_ids(projects_ids)
+
+        # Ensuring projects no longer exist at backend level
+        for project_id in projects_ids:
+            self.assertRaises(exception.ProjectNotFound,
+                              self.resource_api.driver.get_project,
+                              project_id)
+
+        # Passing an empty list is silently ignored
+        self.resource_api.driver.delete_projects_from_ids([])
+
+    def test_delete_projects_from_ids_with_no_existing_project_id(self):
+        """Tests delete_projects_from_ids issues warning if not found.
+
+        Tests the resource backend call delete_projects_from_ids passing a
+        non existing ID in project_ids, which is logged and ignored by
+        the backend.
+        """
+        project_ref = unit.new_project_ref(domain_id=DEFAULT_DOMAIN_ID)
+        self.resource_api.create_project(project_ref['id'], project_ref)
+
+        # Setting up the ID's list
+        projects_ids = (project_ref['id'], uuid.uuid4().hex)
+        with mock.patch('keystone.resource.backends.sql.LOG') as mock_log:
+            self.resource_api.delete_projects_from_ids(projects_ids)
+            self.assertTrue(mock_log.warning.called)
+        # The existing project was deleted.
+        self.assertRaises(exception.ProjectNotFound,
+                          self.resource_api.driver.get_project,
+                          project_ref['id'])
+
+        # Even if we only have one project, and it does not exist, it returns
+        # no error.
+        self.resource_api.driver.delete_projects_from_ids([uuid.uuid4().hex])
+
+    def test_delete_project_cascade(self):
+        # create a hierarchy with 3 levels
+        projects_hierarchy = self._create_projects_hierarchy(hierarchy_size=3)
+        root_project = projects_hierarchy[0]
+        project1 = projects_hierarchy[1]
+        project2 = projects_hierarchy[2]
+
+        # Disabling all projects before attempting to delete
+        for project in (project2, project1, root_project):
+            project['enabled'] = False
+            self.resource_api.update_project(project['id'], project)
+
+        self.resource_api.delete_project(root_project['id'], cascade=True)
+
+        for project in projects_hierarchy:
+            self.assertRaises(exception.ProjectNotFound,
+                              self.resource_api.get_project,
+                              project['id'])
+
+    def test_delete_large_project_cascade(self):
+        """Try delete a large project with cascade true
+        Tree we will create::
+
+               +-p1-+
+               |    |
+              p5    p2
+               |    |
+              p6  +-p3-+
+                  |    |
+                  p7   p4
+        """
+        # create a hierarchy with 4 levels
+        projects_hierarchy = self._create_projects_hierarchy(hierarchy_size=4)
+        p1 = projects_hierarchy[0]
+        # Add the left branch to the hierarchy (p5, p6)
+        self._create_projects_hierarchy(hierarchy_size=2,
+                                        parent_project_id=p1['id'])
+        # Add p7 to the hierarchy
+        p3_id = projects_hierarchy[2]['id']
+        self._create_projects_hierarchy(hierarchy_size=1,
+                                        parent_project_id=p3_id)
+        # Reverse the hierarchy to disable the leaf first
+        prjs_hierarchy = ([p1] + self.resource_api.list_projects_in_subtree(
+                          p1['id']))[::-1]
+
+        # Disabling all projects before attempting to delete
+        for project in prjs_hierarchy:
+            project['enabled'] = False
+            self.resource_api.update_project(project['id'], project)
+
+        self.resource_api.delete_project(p1['id'], cascade=True)
+        for project in prjs_hierarchy:
+            self.assertRaises(exception.ProjectNotFound,
+                              self.resource_api.get_project,
+                              project['id'])
+
+    def test_cannot_delete_project_cascade_with_enabled_child(self):
+        # create a hierarchy with 3 levels
+        projects_hierarchy = self._create_projects_hierarchy(hierarchy_size=3)
+        root_project = projects_hierarchy[0]
+        project1 = projects_hierarchy[1]
+        project2 = projects_hierarchy[2]
+
+        project2['enabled'] = False
+        self.resource_api.update_project(project2['id'], project2)
+
+        # Cannot cascade delete root_project, since project1 is enabled
+        self.assertRaises(exception.ForbiddenAction,
+                          self.resource_api.delete_project,
+                          root_project['id'],
+                          cascade=True)
+
+        # Ensuring no project was deleted, not even project2
+        self.resource_api.get_project(root_project['id'])
+        self.resource_api.get_project(project1['id'])
+        self.resource_api.get_project(project2['id'])
 
     def test_hierarchical_projects_crud(self):
         # create a hierarchy with just a root project (which is a leaf as well)
@@ -4347,6 +4482,78 @@ class IdentityTests(AssignmentTestHelperMixin):
             project_id=new_project['id'],
             include_names=False)
         assert_does_not_contain_names(role_assign_without_names)
+
+    def test_delete_project_assignments_same_id_as_domain(self):
+        """Test deleting project assignments in a scenario that
+        project and domain have the same ID. Only project assignments must
+        be deleted (i.e USER_PROJECT or GROUP_PROJECT).
+
+        Test plan:
+        * Create a project and a domain with the same ID;
+        * Create a user, a group and four roles;
+        * Grant one role to user and one to group on project;
+        * Grant one role to user and one to group on domain;
+        * Delete all project assignments;
+        * Domain roles must stay intact.
+        """
+        # Created a common ID
+        common_id = uuid.uuid4().hex
+        # Create a domain
+        domain = unit.new_domain_ref(id=common_id)
+        domain = self.resource_api.driver.create_domain(common_id, domain)
+        self.assertEqual(common_id, domain['id'])
+        # Create a project
+        project = unit.new_project_ref(id=common_id,
+                                       domain_id=DEFAULT_DOMAIN_ID)
+        project = self.resource_api.driver.create_project(common_id, project)
+        self.assertEqual(common_id, project['id'])
+        # Create a user
+        user = unit.new_user_ref(domain_id=domain['id'])
+        user = self.identity_api.driver.create_user(user['id'], user)
+        # Create a group
+        group = unit.new_group_ref(domain_id=domain['id'])
+        group = self.identity_api.driver.create_group(group['id'], group)
+        # Create four roles
+        roles = []
+        for _ in range(4):
+            role = unit.new_role_ref()
+            roles.append(self.role_api.create_role(role['id'], role))
+        # Assign roles on domain
+        self.assignment_api.driver.create_grant(user_id=user['id'],
+                                                domain_id=domain['id'],
+                                                role_id=roles[0]['id'])
+        self.assignment_api.driver.create_grant(group_id=group['id'],
+                                                domain_id=domain['id'],
+                                                role_id=roles[1]['id'])
+        # Assign roles on project
+        self.assignment_api.driver.create_grant(user_id=user['id'],
+                                                project_id=project['id'],
+                                                role_id=roles[2]['id'])
+        self.assignment_api.driver.create_grant(group_id=group['id'],
+                                                project_id=project['id'],
+                                                role_id=roles[3]['id'])
+        # Make sure they were assigned
+        domain_roles = self.assignment_api.list_role_assignments(
+            domain_id=domain['id'])
+        self.assertThat(domain_roles, matchers.HasLength(2))
+        project_roles = self.assignment_api.list_role_assignments(
+            project_id=project['id']
+        )
+        self.assertThat(project_roles, matchers.HasLength(2))
+        # Delete project assignments
+        self.assignment_api.delete_project_assignments(
+            project_id=project['id'])
+        # Assert only project assignments were deleted
+        project_roles = self.assignment_api.list_role_assignments(
+            project_id=project['id']
+        )
+        self.assertThat(project_roles, matchers.HasLength(0))
+        domain_roles = self.assignment_api.list_role_assignments(
+            domain_id=domain['id'])
+        self.assertThat(domain_roles, matchers.HasLength(2))
+        # Make sure these remaining roles are domain-related
+        for role in domain_roles:
+            self.assertThat(role.keys(), matchers.Contains('domain_id'))
 
 
 class TokenTests(object):

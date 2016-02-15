@@ -14,6 +14,7 @@
 
 import uuid
 
+import mock
 from oslo_config import cfg
 import oslo_context.context
 from oslo_serialization import jsonutils
@@ -28,6 +29,7 @@ from keystone.common import cache
 from keystone.common.validation import validators
 from keystone import exception
 from keystone import middleware
+from keystone.middleware import auth as middleware_auth
 from keystone.tests.common import auth as common_auth
 from keystone.tests import unit
 from keystone.tests.unit import rest
@@ -344,6 +346,15 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
             self.default_domain_user_id, self.project_id,
             self.role_id)
 
+        # Create "req_admin" user for simulating a real user instead of the
+        # admin_token_auth middleware
+        self.user_reqadmin = unit.create_user(self.identity_api,
+                                              DEFAULT_DOMAIN_ID)
+        self.assignment_api.add_role_to_user_and_project(
+            self.user_reqadmin['id'],
+            self.default_domain_project_id,
+            self.role_id)
+
         self.region = unit.new_region_ref()
         self.region_id = self.region['id']
         self.catalog_api.create_region(self.region)
@@ -374,6 +385,34 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         self.assertValidUserResponse(r)
 
         return project
+
+    def get_admin_token(self):
+        """Convenience method so that we can test authenticated requests."""
+        r = self.admin_request(
+            method='POST',
+            path='/v3/auth/tokens',
+            body={
+                'auth': {
+                    'identity': {
+                        'methods': ['password'],
+                        'password': {
+                            'user': {
+                                'name': self.user_reqadmin['name'],
+                                'password': self.user_reqadmin['password'],
+                                'domain': {
+                                    'id': self.user_reqadmin['domain_id']
+                                }
+                            }
+                        }
+                    },
+                    'scope': {
+                        'project': {
+                            'id': self.default_domain_project_id,
+                        }
+                    }
+                }
+            })
+        return r.headers.get('X-Subject-Token')
 
     def get_unscoped_token(self):
         """Convenience method so that we can test authenticated requests."""
@@ -1045,6 +1084,21 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
             *args,
             **kwargs)
 
+    def assertRoleInListResponse(self, resp, ref, expected=1):
+        found_count = 0
+        for entity in resp.result.get('roles'):
+            try:
+                self.assertValidRole(entity, ref=ref)
+            except Exception:
+                # It doesn't match, so let's go onto the next one
+                pass
+            else:
+                found_count += 1
+        self.assertEqual(expected, found_count)
+
+    def assertRoleNotInListResponse(self, resp, ref):
+        self.assertRoleInListResponse(resp, ref=ref, expected=0)
+
     def assertValidRoleResponse(self, resp, *args, **kwargs):
         return self.assertValidResponse(
             resp,
@@ -1058,6 +1112,7 @@ class RestfulTestCase(unit.SQLDriverOverrides, rest.RestfulTestCase,
         self.assertIsNotNone(entity.get('name'))
         if ref:
             self.assertEqual(ref['name'], entity['name'])
+            self.assertEqual(ref['domain_id'], entity['domain_id'])
         return entity
 
     # role assignment validation
@@ -1269,6 +1324,52 @@ class VersionTestCase(RestfulTestCase):
         pass
 
 
+# NOTE(morganfainberg): To be removed when admin_token_auth is removed. This
+# has been split out to allow testing admin_token auth without enabling it
+# for other tests.
+class AuthContextMiddlewareAdminTokenTestCase(RestfulTestCase):
+    EXTENSION_TO_ADD = 'admin_token_auth'
+
+    # NOTE(morganfainberg): This is knowingly copied from below for simplicity
+    # during the deprecation cycle.
+    def _middleware_request(self, token, extra_environ=None):
+
+        def application(environ, start_response):
+            body = 'body'
+            headers = [('Content-Type', 'text/html; charset=utf8'),
+                       ('Content-Length', str(len(body)))]
+            start_response('200 OK', headers)
+            return [body]
+
+        app = webtest.TestApp(middleware.AuthContextMiddleware(application),
+                              extra_environ=extra_environ)
+        resp = app.get('/', headers={middleware.AUTH_TOKEN_HEADER: token})
+        self.assertEqual('body', resp.text)  # just to make sure it worked
+        return resp.request
+
+    def test_admin_auth_context(self):
+        # test to make sure AuthContextMiddleware does not attempt to build the
+        # auth context if the admin_token middleware indicates it's admin
+        # already.
+        token_id = uuid.uuid4().hex  # token doesn't matter.
+        # the admin_token middleware sets is_admin in the context.
+        extra_environ = {middleware.CONTEXT_ENV: {'is_admin': True}}
+        req = self._middleware_request(token_id, extra_environ)
+        auth_context = req.environ.get(authorization.AUTH_CONTEXT_ENV)
+        self.assertDictEqual({}, auth_context)
+
+    @mock.patch.object(middleware_auth.versionutils,
+                       'report_deprecated_feature')
+    def test_admin_token_auth_context_deprecated(self, mock_report_deprecated):
+        # For backwards compatibility AuthContextMiddleware will check that the
+        # admin token (as configured in the CONF file) is present and not
+        # attempt to build the auth context. This is deprecated.
+        req = self._middleware_request(CONF.admin_token)
+        auth_context = req.environ.get(authorization.AUTH_CONTEXT_ENV)
+        self.assertDictEqual({}, auth_context)
+        self.assertEqual(1, mock_report_deprecated.call_count)
+
+
 # NOTE(gyee): test AuthContextMiddleware here instead of test_middleware.py
 # because we need the token
 class AuthContextMiddlewareTestCase(RestfulTestCase):
@@ -1307,13 +1408,6 @@ class AuthContextMiddlewareTestCase(RestfulTestCase):
         # make sure overridden context take precedence
         self.assertEqual(overridden_context,
                          req.environ.get(authorization.AUTH_CONTEXT_ENV))
-
-    def test_admin_token_auth_context(self):
-        # test to make sure AuthContextMiddleware does not attempt to build
-        # auth context if the incoming auth token is the special admin token
-        req = self._middleware_request(CONF.admin_token)
-        auth_context = req.environ.get(authorization.AUTH_CONTEXT_ENV)
-        self.assertDictEqual({}, auth_context)
 
     def test_unscoped_token_auth_context(self):
         unscoped_token = self.get_unscoped_token()

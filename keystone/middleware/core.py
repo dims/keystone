@@ -13,14 +13,17 @@
 # under the License.
 
 from oslo_config import cfg
+from oslo_log import log
+from oslo_log import versionutils
 from oslo_serialization import jsonutils
 
 from keystone.common import wsgi
 from keystone import exception
+from keystone.i18n import _
 
 
 CONF = cfg.CONF
-
+LOG = log.getLogger(__name__)
 
 # Header used to transmit the auth token
 AUTH_TOKEN_HEADER = 'X-Auth-Token'
@@ -56,32 +59,21 @@ class AdminTokenAuthMiddleware(wsgi.Middleware):
 
     """
 
+    def __init__(self, application):
+        super(AdminTokenAuthMiddleware, self).__init__(application)
+        msg = _("Remove admin_token_auth from the paste-ini file, the "
+                "admin_token_auth middleware has been deprecated in favor of "
+                "using keystone-manage bootstrap and real users after "
+                "bootstrap process. Update the [pipeline:api_v3], "
+                "[pipeline:admin_api], and [pipeline:public_api] sections "
+                "accordingly, as it will be removed in the O release.")
+        versionutils.report_deprecated_feature(LOG, msg)
+
     def process_request(self, request):
         token = request.headers.get(AUTH_TOKEN_HEADER)
         context = request.environ.get(CONTEXT_ENV, {})
         context['is_admin'] = (token == CONF.admin_token)
         request.environ[CONTEXT_ENV] = context
-
-
-class PostParamsMiddleware(wsgi.Middleware):
-    """Middleware to allow method arguments to be passed as POST parameters.
-
-    Filters out the parameters `self`, `context` and anything beginning with
-    an underscore.
-
-    """
-
-    def process_request(self, request):
-        params_parsed = request.params
-        params = {}
-        for k, v in params_parsed.items():
-            if k in ('self', 'context'):
-                continue
-            if k.startswith('_'):
-                continue
-            params[k] = v
-
-        request.environ[PARAMS_ENV] = params
 
 
 class JsonBodyMiddleware(wsgi.Middleware):

@@ -17,7 +17,6 @@ from six.moves import http_client
 import webtest
 
 from keystone.auth import controllers as auth_controllers
-from keystone.policy.backends import rules
 from keystone.tests import unit
 from keystone.tests.unit import default_fixtures
 from keystone.tests.unit.ksfixtures import database
@@ -72,12 +71,6 @@ class RestfulTestCase(unit.TestCase):
         self.admin_app = webtest.TestApp(
             self.loadapp(app_conf, name='admin'))
         self.addCleanup(delattr, self, 'admin_app')
-        # Initialize the policy engine and allow us to write to a temp
-        # file in each test to create the policies
-        rules.reset()
-
-        # drop the policy rules
-        self.addCleanup(rules.reset)
 
     def request(self, app, path, body=None, headers=None, token=None,
                 expected_status=None, **kwargs):
@@ -222,6 +215,17 @@ class RestfulTestCase(unit.TestCase):
         """Convenience method so that we can test authenticated requests."""
         r = self.public_request(method='POST', path='/v2.0/tokens', body=body)
         return self._get_token_id(r)
+
+    def get_admin_token(self):
+        return self._get_token({
+            'auth': {
+                'passwordCredentials': {
+                    'username': self.user_reqadmin['name'],
+                    'password': self.user_reqadmin['password']
+                },
+                'tenantId': 'service'
+            }
+        })
 
     def get_unscoped_token(self):
         """Convenience method so that we can test authenticated requests."""
