@@ -46,10 +46,13 @@ _DEPRECATE_EP_MSG = ('The option to enable the OS-ENDPOINT-POLICY extension '
 
 FILE_OPTIONS = {
     None: [
-        cfg.StrOpt('admin_token', secret=True, default='ADMIN',
+        cfg.StrOpt('admin_token', secret=True, default=None,
                    help='A "shared secret" that can be used to bootstrap '
                         'Keystone. This "token" does not represent a user, '
-                        'and carries no explicit authorization. To disable '
+                        'and carries no explicit authorization. If set '
+                        'to `None`, the value is ignored and the '
+                        '`admin_token` log in mechanism is effectively '
+                        'disabled. To completely disable `admin_token` '
                         'in production (highly recommended), remove '
                         'AdminTokenAuthMiddleware from your paste '
                         'application pipelines (for example, in '
@@ -117,7 +120,10 @@ FILE_OPTIONS = {
                          'domain_id. Allowing such movement is not '
                          'recommended if the scope of a domain admin is being '
                          'restricted by use of an appropriate policy file '
-                         '(see policy.v3cloudsample as an example).'),
+                         '(see policy.v3cloudsample as an example). This '
+                         'ability is deprecated and will be removed in a '
+                         'future release.',
+                    deprecated_for_removal=True),
         cfg.BoolOpt('strict_password_check', default=False,
                     help='If set to true, strict password length checking is '
                          'performed for password manipulation. If a password '
@@ -125,11 +131,10 @@ FILE_OPTIONS = {
                          'with an HTTP 403 Forbidden error. If set to false, '
                          'passwords are automatically truncated to the '
                          'maximum length.'),
-        cfg.StrOpt('secure_proxy_ssl_header',
+        cfg.StrOpt('secure_proxy_ssl_header', default="HTTP_X_FORWARDED_PROTO",
                    help='The HTTP header used to determine the scheme for the '
                         'original request, even if it was removed by an SSL '
-                        'terminating proxy. Typical value is '
-                        '"HTTP_X_FORWARDED_PROTO".'),
+                        'terminating proxy.'),
         cfg.BoolOpt('insecure_debug', default=False,
                     help='If set to true the server will return information '
                          'in the response that may allow an unauthenticated '
@@ -780,6 +785,11 @@ FILE_OPTIONS = {
                    help='End user auth connection pool size.'),
         cfg.IntOpt('auth_pool_connection_lifetime', default=60,
                    help='End user auth connection lifetime in seconds.'),
+        cfg.BoolOpt('group_members_are_ids', default=False,
+                    help='If the members of the group objectclass are user '
+                         'IDs rather than DNs, set this to true. This is the '
+                         'case when using posixGroup as the group '
+                         'objectclass and OpenDirectory.'),
     ],
     'auth': [
         cfg.ListOpt('methods', default=_DEFAULT_AUTH_METHODS,

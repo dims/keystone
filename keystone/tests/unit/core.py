@@ -275,7 +275,7 @@ def new_endpoint_ref(service_id, interface='public',
 
     if region_id is NEEDS_REGION_ID:
         ref['region_id'] = uuid.uuid4().hex
-    elif region_id is None and kwargs.get('region', None) is not None:
+    elif region_id is None and kwargs.get('region') is not None:
         # pre-3.2 form endpoints are not supported by this function
         raise NotImplementedError("use new_endpoint_ref_with_region")
     else:
@@ -307,16 +307,19 @@ def new_domain_ref(**kwargs):
     return ref
 
 
-def new_project_ref(domain_id=None, parent_id=None, is_domain=False, **kwargs):
+def new_project_ref(domain_id=None, is_domain=False, **kwargs):
     ref = {
         'id': uuid.uuid4().hex,
         'name': uuid.uuid4().hex,
         'description': uuid.uuid4().hex,
         'enabled': True,
         'domain_id': domain_id,
-        'parent_id': parent_id,
         'is_domain': is_domain,
     }
+    # NOTE(henry-nash): We don't include parent_id in the initial list above
+    # since specifying it is optional depending on where the project sits in
+    # the hierarchy (and a parent_id of None has meaning - i.e. it's a top
+    # level project).
     ref.update(kwargs)
     return ref
 

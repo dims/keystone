@@ -134,7 +134,7 @@ The primary configuration file is organized into the following sections:
 * ``[signing]`` - Cryptographic signatures for PKI based tokens
 * ``[ssl]`` - SSL certificate generation configuration
 * ``[token]`` - Token driver & token provider configuration
-* ``[trust]`` - Trust extension configuration
+* ``[trust]`` - Trust configuration
 
 The Keystone primary configuration file is expected to be named
 ``keystone.conf``. When starting Keystone, you can specify a different
@@ -1036,28 +1036,11 @@ and is only recommended for developments environment. We do not recommend using
 ``ssl_setup`` for production environments.
 
 
-User CRUD extension for the V2.0 API
+User CRUD additions for the V2.0 API
 ------------------------------------
 
-.. NOTE::
-
-    The core V3 API includes user operations so no extension needs to be
-    enabled for the V3 API.
-
-For the V2.0 API, Keystone provides a user CRUD filter that can be added to the
-public_api pipeline. This user crud filter allows users to use a HTTP PATCH to
-change their own password. To enable this extension you should define a
-user_crud_extension filter, insert it after the ``*_body`` middleware and
-before the ``public_service`` app in the public_api WSGI pipeline in
-``keystone-paste.ini`` e.g.:
-
-.. code-block:: ini
-
-    [filter:user_crud_extension]
-    paste.filter_factory = keystone.contrib.user_crud:CrudExtension.factory
-
-    [pipeline:public_api]
-    pipeline = url_normalize token_auth admin_token_auth json_body debug ec2_extension user_crud_extension public_service
+For the V2.0 API, Keystone provides an additional capability that allows users
+to use a HTTP PATCH to change their own password.
 
 Each user can then change their own password with a HTTP PATCH :
 
@@ -1356,6 +1339,7 @@ are filtered out (e.g. user passwords).
 List of object attributes:
 
 * role:
+    * target.role.domain_id
     * target.role.id
     * target.role.name
 
