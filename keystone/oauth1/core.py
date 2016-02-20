@@ -161,6 +161,8 @@ class Manager(manager.Manager):
         super(Manager, self).__init__(CONF.oauth1.driver)
 
     def create_consumer(self, consumer_ref, initiator=None):
+        consumer_ref = consumer_ref.copy()
+        consumer_ref['secret'] = uuid.uuid4().hex
         ret = self.driver.create_consumer(consumer_ref)
         notifications.Audit.created(self._CONSUMER, ret['id'], initiator)
         return ret
@@ -335,11 +337,11 @@ class Oauth1DriverV8(object):
         raise exception.NotImplemented()  # pragma: no cover
 
     @abc.abstractmethod
-    def authorize_request_token(self, request_id, user_id, role_ids):
+    def authorize_request_token(self, request_token_id, user_id, role_ids):
         """Authorize request token.
 
-        :param request_id: the id of the request token, to be authorized
-        :type request_id: string
+        :param request_token_id: the id of the request token, to be authorized
+        :type request_token_id: string
         :param user_id: the id of the authorizing user
         :type user_id: string
         :param role_ids: list of role ids to authorize
