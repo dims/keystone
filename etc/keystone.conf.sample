@@ -308,6 +308,12 @@
 # The chosen port is displayed in the service's log file. (string value)
 #backdoor_port = <None>
 
+# Enable eventlet backdoor, using the provided path as a unix socket that can
+# receive connections. This option is mutually exclusive with 'backdoor_port'
+# in that only one should be be provided. If both are provided then the
+# existence of this option overrides the usage of that option. (string value)
+#backdoor_socket = <None>
+
 # Enables or disables logging values of all registered options when starting a
 # service (at DEBUG level). (boolean value)
 #log_options = true
@@ -1025,6 +1031,9 @@
 # LDAP attribute mapped to user name. (string value)
 #user_name_attribute = sn
 
+# LDAP attribute mapped to user description. (string value)
+#user_description_attribute = description
+
 # LDAP attribute mapped to user email. (string value)
 #user_mail_attribute = mail
 
@@ -1196,6 +1205,11 @@
 
 # End user auth connection lifetime in seconds. (integer value)
 #auth_pool_connection_lifetime = 60
+
+# If the members of the group objectclass are user IDs rather than DNs, set
+# this to true. This is the case when using posixGroup as the group objectclass
+# and OpenDirectory. (boolean value)
+#group_members_are_ids = false
 
 
 [matchmaker_redis]
